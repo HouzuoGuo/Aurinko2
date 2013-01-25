@@ -39,12 +39,12 @@ class Collection(override val fc: FileChannel) extends AppendableMemoryMappedFil
     val padding = " ".*(len * 2).getBytes()
     fc.synchronized {
       checkRemap(room)
-      buf.position(_appendAt)
+      buf.position(appendAt)
       buf.putInt(1)
       buf.putInt(room)
       buf.put(data)
       buf.put(padding)
-      _appendAt += 8 + room
+      appendAt += 8 + room
     }
   }
 

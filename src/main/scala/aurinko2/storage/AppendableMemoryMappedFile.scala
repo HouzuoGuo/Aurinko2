@@ -3,20 +3,24 @@ package aurinko2.storage
 import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
 
-abstract class AppendableMemoryMappedFile(val fc: FileChannel, val growBy: Int) {
-  protected var buf = fc.map(MapMode.READ_WRITE, 0, fc.size())
-  protected var _appendAt = 0;
+abstract class AppendableMemoryMappedFile(protected val fc: FileChannel, protected val growBy: Int) {
+  protected var buf = fc.map(MapMode.READ_WRITE, 0, Math.max(growBy, fc.size()))
+  protected var appendAt = buf.limit() / 2;
 
   // Find next append position
   {
     var left = 0
-    var right = buf.limit()
-    while (left != right) {
-      _appendAt = (right - left) / 2
-      if (buf.get(_appendAt) == 0)
-        right = _appendAt
-      else
-        left = _appendAt
+    var right = buf.limit() - 1
+    while (right - left > 1) {
+      println("left " + left + " now " + appendAt + " right " + right)
+      buf.position(appendAt)
+      if (buf.getInt() == 0) {
+        appendAt -= (appendAt - left) / 2
+        right = appendAt
+      } else {
+        appendAt += (right - appendAt) / 2
+        left = appendAt
+      }
     }
   }
 
@@ -26,9 +30,9 @@ abstract class AppendableMemoryMappedFile(val fc: FileChannel, val growBy: Int) 
    */
 
   protected def checkRemap(room: Int): Boolean = {
-    if (_appendAt + room > buf.limit()) {
+    if (appendAt + room > buf.limit()) {
       buf.force()
-      buf = fc.map(MapMode.READ_WRITE, 0, fc.size() + growBy)
+      buf = fc.map(MapMode.READ_WRITE, 0, fc.size() + Math.max(growBy, room))
       return true
     }
     return false

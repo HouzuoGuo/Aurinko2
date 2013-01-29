@@ -3,32 +3,66 @@ package aurinko2.storage
 import java.nio.channels.FileChannel
 
 object Collection {
-  val GROWTH = 67108864
+  val GROWTH = 67108864 // Collection file grows 64MB when full
+  val DOC_HEADER_SIZE = 8 // Header: validity (int), room for document (int)
+  val DOC_PADDING = 2 // How much space (N times) to leave for a document to grow
+  val DOC_VALID = 1 // Document validity == true
+
+  // Document may not be larger than 16 MB when inserted
+  val MAX_DOC_SIZE = 16777216
+  val MAX_DOC_ROOM = MAX_DOC_SIZE * (1 + DOC_PADDING)
 }
+
 class Collection(override protected val fc: FileChannel) extends AppendFile(fc, Collection.GROWTH) {
-  def insert(doc: Array[Byte]): Int = {
-    val id = appendAt
-    val len = doc.length
-    val room = len * 3
-    val padding = " ".*(len * 2).getBytes()
+
+  /** Return document read at the position; return null if the document is no longer valid. */
+  def read(id: Int): Array[Byte] = {
     fc.synchronized {
+      buf.position(id)
+      val valid = buf.getInt()
+      if (valid != Collection.DOC_VALID)
+        return null
+      val room = buf.getInt()
+
+      // Possible document header corruption, better repair the collection
+      if (room > Collection.MAX_DOC_ROOM)
+        throw new Exception("Document " + id + " exceeds MAX_DOC_ROOM - data corruption?")
+      val data = Array.ofDim[Byte](room)
+      buf.get(data)
+      return data
+    }
+  }
+
+  /** Insert a document; return inserted document ID. */
+  def insert(doc: Array[Byte]): Int = {
+    if (doc.length > Collection.MAX_DOC_SIZE)
+      throw new Exception("Document " + new String(doc) + " exceeds MAX_DOC_SIZE")
+    var id = -1
+    val len = doc.length
+    val room = len + len * Collection.DOC_PADDING
+    val padding = " ".*(len * Collection.DOC_PADDING).getBytes()
+    fc.synchronized {
+      id = appendAt
       checkGrow(room)
       buf.position(appendAt)
-      buf.putInt(1)
+      buf.putInt(Collection.DOC_VALID)
       buf.putInt(room)
       buf.put(doc)
       buf.put(padding)
-      appendAt += 8 + room
+      appendAt += Collection.DOC_HEADER_SIZE + room
     }
     return id
   }
 
+  /** Update a document; return updated document ID. */
   def update(id: Int, doc: Array[Byte]): Int = {
+    if (doc.length > Collection.MAX_DOC_ROOM)
+      throw new Exception("Document " + new String(doc) + " exceeds MAX_DOC_ROOM")
     val len = doc.length
     fc.synchronized {
-      buf.position(appendAt)
+      buf.position(id)
       val valid = buf.getInt()
-      if (valid == 0)
+      if (valid != Collection.DOC_VALID)
         return id
       val room = buf.getInt()
       if (room >= len) {
@@ -42,6 +76,7 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
     }
   }
 
+  /** Delete a document. */
   def delete(id: Int) {
     fc.synchronized {
       buf.position(id)

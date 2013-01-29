@@ -7,8 +7,9 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
   protected var buf = fc.map(MapMode.READ_WRITE, 0, fc.size())
   protected var appendAt = buf.limit / 2
 
+  /* Initialise next appending position (appendAt) using binary search.
+  The position must have data 0L and be as close as possible to BOF. */
   if (buf.limit > 0) {
-    // Find appending position - closest 0L
     var left = 0
     var right = buf.limit
     while (right - left > 1) {
@@ -20,10 +21,11 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
         left = appendAt
         appendAt += (right - appendAt) / 2
       }
-      println("Left " + left + " now " + appendAt + " right " + right)
     }
+    appendAt += 1
   }
 
+  /** Re-map the file if more room is needed for appending more data. */
   def checkGrow(room: Int): Boolean = {
     if (appendAt + room > buf.limit) {
       force()
@@ -33,6 +35,9 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
     return false
   }
 
+  /** Make sure that mapped buffer is written through to storage device. */
   def force() { buf.force() }
+
+  /** Close the file channel. */
   def close() { force(); fc.close() }
 }

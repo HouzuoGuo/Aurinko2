@@ -4,7 +4,7 @@ import java.io.RandomAccessFile
 import aurinko2.storage.Collection
 
 class CollectionTest extends FunSuite {
-  val largeDoc = """
+  val doc = """
 The standard source locations for testing are:
 Scala sources in src/test/scala/
 Java sources in src/test/java/
@@ -14,22 +14,45 @@ The resources may be accessed from tests by using the getResource methods of jav
 
 The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an implementation of the common test interface and only need to be added to the classpath to work with sbt. For example, ScalaCheck may be used by declaring it as a managed dependency:
     libraryDependencies += "org.scala-tools.testing" %% "scalacheck" % "1.9" % "test"
+""".trim()
+  val docBytes = doc.getBytes()
 
-The fourth component "test" is the configuration and means that ScalaCheck will only be on the test classpath and it isn't needed by the main sources. This is generally good practice for libraries because your users don't typically need your test dependencies to use your library.
-
-With the library dependency defined, you can then add test sources in the locations listed above and compile and run tests. The tasks for running tests are test and test-only. The test task accepts no command line arguments and runs all tests:
-> test
-"""
-  val largeDocBytes = largeDoc.getBytes()
-
-  test("insert and read") {
-    val tmp = File.createTempFile(System.nanoTime().toString, null)
+  def tmpCollection(): Collection = {
+    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
     tmp.deleteOnExit()
     val raf = new RandomAccessFile(tmp, "rw")
-    val col = new Collection(raf.getChannel())
-    for (i <- 0 to 100000) {
-      // The document has to be large enough to make collection grow
-      assert(new String(col.read(col.insert(largeDocBytes))).trim().equals(largeDoc))
-    }
+    return new Collection(raf.getChannel())
+  }
+
+  test("insert and read") {
+    val col = tmpCollection()
+
+    // The collection will have to grow a few times
+    for (i <- 0 to 100000)
+      assert(new String(col.read(col.insert(docBytes))).trim().equals(doc))
+  }
+
+  test("update and read") {
+    val col = tmpCollection()
+    val docs = Array(col.insert("1".getBytes()), col.insert("2".getBytes()),
+      col.insert("A".getBytes()), col.insert("B".getBytes()))
+    assert(new String(col.read(col.update(docs(0), "A".getBytes()))).trim().equals("A"))
+    assert(new String(col.read(col.update(docs(1), "BC".getBytes()))).trim().equals("BC"))
+    assert(new String(col.read(col.update(docs(2), "DEF".getBytes()))).trim().equals("DEF"))
+
+    // Re-insert
+    assert(new String(col.read(col.update(docs(3), "GHIJKL".getBytes()))).trim().equals("GHIJKL"))
+  }
+
+  test("delete and read") {
+    val col = tmpCollection()
+    val docs = Array(col.insert("1".getBytes()), col.insert("2".getBytes()),
+      col.insert("A".getBytes()), col.insert("B".getBytes()))
+    col.delete(docs(0))
+    col.delete(docs(3))
+    assert(col.read(docs(0)) == null)
+    assert(col.read(docs(3)) == null)
+    assert(new String(col.read(docs(1))).trim().equals("2"))
+    assert(new String(col.read(docs(2))).trim().equals("A"))
   }
 }

@@ -18,9 +18,12 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
     var data = log
 
     // Put padding spaces into log entry to fill up an entry block
-    if (log.length % Log.BLOCK_SIZE != 0)
-      data = Array.concat(log, " ".*(log.length % Log.BLOCK_SIZE).getBytes())
+    if (data.length % Log.BLOCK_SIZE != 0)
+      data = Array.concat(log, " ".*(Log.BLOCK_SIZE - data.length % Log.BLOCK_SIZE).getBytes())
+
+    val entrySize = data.length + (data.length / Log.BLOCK_SIZE) * Log.BLOCK_HEADER_SIZE
     fc.synchronized {
+      checkGrow(entrySize)
       id = appendAt
       val time = System.nanoTime
       buf.position(appendAt)
@@ -30,7 +33,7 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
         buf.putLong(time)
         buf.put(data.slice(slice, slice + Log.BLOCK_SIZE))
       }
-      appendAt += data.length + (data.length / Log.BLOCK_SIZE) * Log.BLOCK_HEADER_SIZE
+      appendAt += entrySize
     }
     return id
   }
@@ -42,31 +45,30 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
     fc.synchronized {
       buf.position(id)
       do {
-
         // Remember entry's time stamp
         if (timestamp == -1)
           timestamp = buf.getLong()
-        else
-          buf.position(buf.position() + Log.BLOCK_HEADER_SIZE)
         val slice = new Array[Byte](Log.BLOCK_SIZE)
         buf.get(slice)
         slices += slice
 
-        // Keep on reading, until the next entry has a different time stamp 
-      } while (buf.position() < buf.limit() - Log.BLOCK_HEADER_SIZE && buf.getLong() == timestamp)
+        // Keep on reading, until the next entry has a different time stamp
+        // Intentionally using & instead of &&
+      } while (buf.position() < appendAt - Log.BLOCK_HEADER_SIZE & buf.getLong() == timestamp)
     }
     return slices.toArray.flatten
   }
 
   /** Iterate through all log entries. */
-  def foreach()(f: Array[Byte] => Unit) {
+  def foreach(f: Array[Byte] => Unit) {
+    var continue = true
     fc.synchronized {
       buf.position(0)
-      while (buf.position() < buf.limit() - Log.BLOCK_HEADER_SIZE) {
-        f(read(buf.position()))
 
-        // Because "read" looks ahead next block's time stamp,
-        // so here buffer position should move back
+      // While the entry is not empty (has a time stamp)
+      while (buf.getLong() != 0) {
+        buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
+        f(read(buf.position()))
         buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
       }
     }

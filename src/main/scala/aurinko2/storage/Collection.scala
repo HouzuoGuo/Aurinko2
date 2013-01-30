@@ -17,6 +17,9 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
 
   /** Return document read at the position; return null if the document is no longer valid. */
   def read(id: Int): Array[Byte] = {
+    if (id > appendAt)
+      throw new Exception("Document ID " + id + " is out of range")
+
     fc.synchronized {
       buf.position(id)
       val valid = buf.getInt()
@@ -26,7 +29,7 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
 
       // Possible document header corruption, better repair the collection
       if (room > Collection.MAX_DOC_ROOM)
-        throw new Exception("Document " + id + " exceeds MAX_DOC_ROOM - data corruption?")
+        throw new Exception("Document " + id + " exceeds MAX_DOC_ROOM - invalid ID or data corruption?")
       val data = Array.ofDim[Byte](room)
       buf.get(data)
       return data
@@ -37,6 +40,7 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
   def insert(doc: Array[Byte]): Int = {
     if (doc.length > Collection.MAX_DOC_SIZE)
       throw new Exception("Document " + new String(doc) + " exceeds MAX_DOC_SIZE")
+
     var id = -1
     val len = doc.length
     val room = len + len * Collection.DOC_PADDING
@@ -58,6 +62,9 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
   def update(id: Int, doc: Array[Byte]): Int = {
     if (doc.length > Collection.MAX_DOC_ROOM)
       throw new Exception("Document " + new String(doc) + " exceeds MAX_DOC_ROOM")
+    if (id > appendAt)
+      throw new Exception("Document ID " + id + " is out of range")
+
     val len = doc.length
     fc.synchronized {
       buf.position(id)
@@ -65,6 +72,11 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
       if (valid != Collection.DOC_VALID)
         return id
       val room = buf.getInt()
+
+      // Not a document or document header corruption
+      if (room > Collection.MAX_DOC_ROOM)
+        throw new Exception("Document " + id + " exceeds MAX_DOC_ROOM - invalid ID or data corruption?")
+
       if (room >= len) {
         buf.put(doc)
         buf.put(" ".*(room - len).getBytes())
@@ -78,6 +90,9 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
 
   /** Delete a document. */
   def delete(id: Int) {
+    if (id > appendAt)
+      throw new Exception("Document ID " + id + " is out of range")
+
     fc.synchronized {
       buf.position(id)
       buf.putInt(0)

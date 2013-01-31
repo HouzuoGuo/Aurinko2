@@ -7,6 +7,7 @@ object Collection {
   val DOC_HEADER_SIZE = 8 // Header: validity (int), room for document (int)
   val DOC_PADDING = 2 // How much space (N times) to leave for a document to grow
   val DOC_VALID = 1 // Document validity == true
+  val DOC_INVALID = 0 // Document validity == false
 
   // Document may not be larger than 16 MB when inserted
   val MAX_DOC_SIZE = 16777216
@@ -18,13 +19,18 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
   /** Return document read at the position; return null if the document is no longer valid. */
   def read(id: Int): Array[Byte] = {
     if (id > appendAt)
-      throw new Exception("Document ID " + id + " is out of range")
+      throw new IllegalArgumentException("Document ID " + id + " is out of range")
 
     fc.synchronized {
       buf.position(id)
       val valid = buf.getInt()
-      if (valid != Collection.DOC_VALID)
+      if (valid == Collection.DOC_INVALID)
         return null
+
+      // Not a document header?
+      if (valid != Collection.DOC_VALID)
+        throw new IllegalArgumentException("There is not document at ID " + id)
+
       val room = buf.getInt()
 
       // Possible document header corruption, better repair the collection
@@ -39,7 +45,7 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
   /** Insert a document; return inserted document ID. */
   def insert(doc: Array[Byte]): Int = {
     if (doc.length > Collection.MAX_DOC_SIZE)
-      throw new Exception("Document " + new String(doc) + " exceeds MAX_DOC_SIZE")
+      throw new IllegalArgumentException("Document " + new String(doc) + " exceeds MAX_DOC_SIZE")
 
     var id = -1
     val len = doc.length
@@ -61,16 +67,21 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
   /** Update a document; return updated document ID. */
   def update(id: Int, doc: Array[Byte]): Int = {
     if (doc.length > Collection.MAX_DOC_ROOM)
-      throw new Exception("Document " + new String(doc) + " exceeds MAX_DOC_ROOM")
+      throw new IllegalArgumentException("Document " + new String(doc) + " exceeds MAX_DOC_ROOM")
     if (id > appendAt)
-      throw new Exception("Document ID " + id + " is out of range")
+      throw new IllegalArgumentException("There is not document at ID " + id)
 
     val len = doc.length
     fc.synchronized {
       buf.position(id)
       val valid = buf.getInt()
-      if (valid != Collection.DOC_VALID)
+      if (valid == Collection.DOC_INVALID)
         return id
+
+      // Not a document header?
+      if (valid != Collection.DOC_VALID)
+        throw new IllegalArgumentException("There is not document at ID " + id)
+
       val room = buf.getInt()
 
       // Not a document or document header corruption
@@ -91,11 +102,19 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
   /** Delete a document. */
   def delete(id: Int) {
     if (id > appendAt)
-      throw new Exception("Document ID " + id + " is out of range")
+      throw new IllegalArgumentException("Document ID " + id + " is out of range")
 
     fc.synchronized {
       buf.position(id)
-      buf.putInt(0)
+      val valid = buf.getInt()
+
+      if (valid != Collection.DOC_INVALID)
+        if (valid == Collection.DOC_VALID) {
+          println("Deleting")
+          buf.position(id)
+          buf.putInt(0)
+        } else
+          throw new IllegalArgumentException("There is not document at ID " + id)
     }
   }
 }

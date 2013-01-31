@@ -17,7 +17,7 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
 """.trim()
   val docBytes = doc.getBytes()
 
-  test("Re-open file and find next append position") {
+  test("re-open file and find next append position") {
     val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
     tmp.deleteOnExit()
     val raf = new RandomAccessFile(tmp, "rw")

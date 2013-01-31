@@ -40,6 +40,9 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
 
   /** Return log entry read at the position. */
   def read(id: Int): Array[Byte] = {
+    if (id > appendAt)
+      throw new IllegalArgumentException("Log entry ID " + id + " is out of range")
+
     val slices = new ListBuffer[Array[Byte]]()
     var timestamp = -1L
     fc.synchronized {
@@ -65,7 +68,7 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
     fc.synchronized {
       buf.position(0)
 
-      // While the entry is not empty (has a time stamp)
+      // While the entry is not empty
       while (buf.getLong() != 0) {
         buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
         f(read(buf.position()))

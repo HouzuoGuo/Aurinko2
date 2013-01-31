@@ -30,6 +30,15 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
       assert(new String(log.read(log.insert(entryBytes))).trim().equals(entry))
   }
 
+  test("read log entry given incorrect ID") {
+    val log = tmpLog()
+    for (i <- 0 to 1000)
+      log.insert(entryBytes)
+    intercept[IllegalArgumentException] {
+      log.read(1000000000) // 1G
+    }
+  }
+
   test("iterate all entries") {
     val log = tmpLog()
     for (i <- 0 until 100000)

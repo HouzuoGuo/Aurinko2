@@ -55,4 +55,46 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
     assert(new String(col.read(docs(1))).trim().equals("2"))
     assert(new String(col.read(docs(2))).trim().equals("A"))
   }
+
+  test("delete document given incorrect ID") {
+    val col = tmpCollection()
+    col.insert("1".getBytes())
+    col.insert("2".getBytes())
+    col.insert("A".getBytes())
+    col.insert("B".getBytes())
+    intercept[IllegalArgumentException] {
+      col.delete(10000)
+    }
+    intercept[IllegalArgumentException] {
+      col.delete(12)
+    }
+  }
+
+  test("update document given incorrect ID") {
+    val col = tmpCollection()
+    col.insert("1".getBytes())
+    col.insert("2".getBytes())
+    col.insert("A".getBytes())
+    col.insert("B".getBytes())
+    intercept[IllegalArgumentException] {
+      col.update(10000, "".getBytes())
+    }
+    intercept[IllegalArgumentException] {
+      col.update(12, "".getBytes())
+    }
+  }
+
+  test("read document given incorrect ID") {
+    val col = tmpCollection()
+    col.insert("1".getBytes())
+    col.insert("2".getBytes())
+    col.insert("A".getBytes())
+    col.insert("B".getBytes())
+    intercept[IllegalArgumentException] {
+      col.read(1000)
+    }
+    intercept[IllegalArgumentException] {
+      col.read(12)
+    }
+  }
 }

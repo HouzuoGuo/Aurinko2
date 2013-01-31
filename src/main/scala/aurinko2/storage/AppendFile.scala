@@ -4,10 +4,15 @@ import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
 
 abstract class AppendFile(protected val fc: FileChannel, protected val growBy: Int) {
+  if (fc == null || !fc.isOpen())
+    throw new IllegalArgumentException("File channel is null")
+  if (growBy < 1024)
+    throw new IllegalArgumentException("File growth is too small (< 1KB)")
+
   protected var buf = fc.map(MapMode.READ_WRITE, 0, fc.size())
   protected var appendAt = buf.limit / 2
 
-  /* Initialise next appending position (appendAt) using binary search.
+  /* Find next appending position (appendAt) using binary search.
   The position must have data 0L and be as close as possible to BOF. */
   if (buf.limit > 0) {
     var left = 0
@@ -25,8 +30,11 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
     appendAt += 1
   }
 
-  /** Re-map the file if more room is needed for appending more data. */
+  /** Re-map the file and return true if more room is needed for appending more data. */
   def checkGrow(room: Int): Boolean = {
+    if (room < 1)
+      throw new IllegalArgumentException("room must be > 0")
+
     if (appendAt + room > buf.limit) {
       force()
       buf = fc.map(MapMode.READ_WRITE, 0, buf.limit + growBy)

@@ -1,5 +1,6 @@
 package aurinko2.storage
 
+import scala.math.max
 import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
 
@@ -9,12 +10,12 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
   if (growBy < 1024)
     throw new IllegalArgumentException("File growth is too small (< 1KB)")
 
-  protected var buf = fc.map(MapMode.READ_WRITE, 0, fc.size())
+  protected var buf = fc.map(MapMode.READ_WRITE, 0, max(growBy, fc.size()))
   protected var appendAt = buf.limit / 2
 
   /* Find next appending position (appendAt) using binary search.
   The position must have data 0L and be as close as possible to BOF. */
-  if (buf.limit > 0) {
+  {
     var left = 0
     var right = buf.limit
     while (right - left > 1) {
@@ -27,7 +28,13 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
         appendAt += (right - appendAt) / 2
       }
     }
-    appendAt += 1
+    buf.position(appendAt)
+    val int1 = buf.getInt()
+    val int2 = buf.getInt()
+    if (int2 != 0)
+      appendAt += 8
+    else if (int1 != 0)
+      appendAt += 4
   }
 
   /** Re-map the file and return true if more room is needed for appending more data. */

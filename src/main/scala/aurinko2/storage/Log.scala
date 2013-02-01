@@ -11,6 +11,9 @@ object Log {
 }
 
 class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GROWTH) {
+  // Fix append position
+  if (appendAt % Log.BLOCK_SIZE != 0)
+    appendAt += Log.BLOCK_SIZE - appendAt % Log.BLOCK_SIZE
 
   /** Insert a log entry. */
   def insert(log: Array[Byte]): Int = {
@@ -52,6 +55,7 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
         if (timestamp == -1)
           timestamp = buf.getLong()
         val slice = new Array[Byte](Log.BLOCK_SIZE)
+
         buf.get(slice)
         slices += slice
 
@@ -64,7 +68,6 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
 
   /** Iterate through all log entries. */
   def foreach(f: Array[Byte] => Unit) {
-    var continue = true
     fc.synchronized {
       buf.position(0)
 

@@ -4,13 +4,13 @@ import scala.math.max
 import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
 
-abstract class AppendFile(protected val fc: FileChannel, protected val growBy: Int) {
+abstract class AppendFile(protected val fc: FileChannel, protected val growBy: Int, protected val minSize: Int) {
   if (fc == null || !fc.isOpen())
     throw new IllegalArgumentException("File channel is null")
   if (growBy < 1024)
     throw new IllegalArgumentException("File growth is too small (< 1KB)")
 
-  protected var buf = fc.map(MapMode.READ_WRITE, 0, max(growBy, fc.size()))
+  protected var buf = fc.map(MapMode.READ_WRITE, 0, max(minSize, fc.size()))
   protected var appendAt = buf.limit / 2
 
   /* Find next appending position (appendAt) using binary search.

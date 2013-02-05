@@ -10,7 +10,7 @@ object Log {
   val BLOCK_SIZE = 256 // Entry is separated into blocks of 256 bytes
 }
 
-class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GROWTH) {
+class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GROWTH, Log.GROWTH) {
   // Fix append position
   if (appendAt % Log.BLOCK_SIZE != 0)
     appendAt += Log.BLOCK_SIZE - appendAt % Log.BLOCK_SIZE

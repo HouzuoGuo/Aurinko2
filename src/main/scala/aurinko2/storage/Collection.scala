@@ -14,7 +14,7 @@ object Collection {
   val MAX_DOC_ROOM = MAX_DOC_SIZE * (1 + DOC_PADDING)
 }
 
-class Collection(override protected val fc: FileChannel) extends AppendFile(fc, Collection.GROWTH) {
+class Collection(override protected val fc: FileChannel) extends AppendFile(fc, Collection.GROWTH, Collection.GROWTH) {
 
   /** Return document read at the position; return null if the document is no longer valid. */
   def read(id: Int): Array[Byte] = {

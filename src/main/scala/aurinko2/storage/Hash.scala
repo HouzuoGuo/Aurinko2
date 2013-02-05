@@ -1,37 +1,39 @@
 package aurinko2.storage
 
 import java.nio.channels.FileChannel
-import scala.collection.mutable.ListBuffer
 import java.util.logging.Logger
+import scala.collection.mutable.ListBuffer
+import scala.math.pow
 
 object Hash {
   val GROWTH = 67108864 // Hash file grows by 64MB when full
-  val HASH_BITS = 12 // Last 12 bits of key are taken as hash 
-  val PER_BUCKET = 100 // There are 100 hash entries per bucket
   val BUCKET_HEADER_SIZE = 4 // Bucket header: next chained bucket number (int)
   val ENTRY_SIZE = 12 // Entry: validity (int), key (int), value (int)
-  val BUCKET_SIZE = BUCKET_HEADER_SIZE + ENTRY_SIZE * PER_BUCKET
   val ENTRY_VALID = 1
   val ENTRY_INVALID = 0
   val LOG = Logger.getLogger(classOf[Hash].getName())
-  def hashKey(key: Int): Int = {
-    return key & (Hash.HASH_BITS << 1)
-  }
 }
-class Hash(override protected val fc: FileChannel) extends AppendFile(fc, Hash.GROWTH, Hash.HASH_BITS ^ 2 * Hash.BUCKET_SIZE) {
+class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBucket: Int)
+  extends AppendFile(fc, Hash.GROWTH, pow(2, hashBits).toInt * (Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket)) {
+  // Size of a bucket full of entries, including bucket header
+  val bucketSize = Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket
+  def hashKey(key: Int): Int = {
+    return key & ((hashBits << 1) - 1)
+  }
+
   // Fix append position
-  if (appendAt % Hash.BUCKET_SIZE != 0)
-    appendAt += Hash.BUCKET_SIZE - appendAt % Hash.BUCKET_SIZE
+  if (appendAt % bucketSize != 0)
+    appendAt += bucketSize - appendAt % bucketSize
 
   /** Return total number of buckets. */
-  private def numberOfBuckets = appendAt / Hash.BUCKET_SIZE
+  private def numberOfBuckets = appendAt / bucketSize
 
   /** Return next chained bucket number. */
   private def next(bucket: Int): Int = {
     at(bucket)
     val nextBucket = buf.getInt()
     if (nextBucket <= bucket) {
-      Hash.LOG.severe(s"Hash index file is corrupted - there is a loop in bucket chain $bucket")
+      Hash.LOG.severe(s"Hash corruption - loop in chain $bucket")
       return 0
     }
     return nextBucket
@@ -48,31 +50,31 @@ class Hash(override protected val fc: FileChannel) extends AppendFile(fc, Hash.G
   /** Position buffer to beginning of the bucket. */
   private def at(bucket: Int) {
     if (bucket < 0) {
-      Hash.LOG.severe(s"Bucket number may not be negative - $bucket")
+      Hash.LOG.severe(s"Negative bucket number $bucket")
     }
-    buf.position(bucket * Hash.BUCKET_SIZE)
+    buf.position(bucket * bucketSize)
   }
 
   /** Put a new bucket in the bucket chain. */
   private def grow(bucket: Int) {
     fc.synchronized {
       force()
-      checkGrow(Hash.BUCKET_SIZE)
+      checkGrow(bucketSize)
       at(last(bucket))
       buf.putInt(numberOfBuckets)
-      appendAt += Hash.BUCKET_SIZE
+      appendAt += bucketSize
     }
   }
 
   /** Process no more than limited number of entries in the key's bucket chain. Return processed entries. */
-  private def scan(hashedKey: Int, limit: Int, procFun: Int => Unit, filter: (Int, Int) => Boolean): List[Int] = {
-    val startBucket = Hash.hashKey(hashedKey)
-    val result = new ListBuffer[Int]()
+  private def scan(hashedKey: Int, limit: Int, procFun: Int => Unit, filter: (Int, Int) => Boolean): List[Tuple2[Int, Int]] = {
+    val startBucket = hashKey(hashedKey)
+    val result = new ListBuffer[Tuple2[Int, Int]]()
     var bucket = startBucket
 
     while (bucket != 0) {
-      for (entry <- 0 until Hash.PER_BUCKET) {
-        buf.position(bucket * Hash.BUCKET_SIZE + entry * Hash.ENTRY_SIZE)
+      for (entry <- 0 until perBucket) {
+        buf.position(bucket * bucketSize + Hash.BUCKET_HEADER_SIZE + entry * Hash.ENTRY_SIZE)
         val entryPos = buf.position()
         val validity = buf.getInt()
         val entryKey = buf.getInt()
@@ -83,10 +85,10 @@ class Hash(override protected val fc: FileChannel) extends AppendFile(fc, Hash.G
           return result.toList
 
         if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
-          Hash.LOG.severe(s"Hash index file is corrupted - there is no valid entry header at $entryPos")
+          Hash.LOG.severe(s"Hash corruption - invalid entry header $entryPos")
         else if (entryKey == hashedKey && filter(entryKey, value)) {
           procFun(entryPos)
-          result += entryKey
+          result += Tuple2(entryKey, value)
         }
       }
       bucket = next(bucket)
@@ -96,13 +98,15 @@ class Hash(override protected val fc: FileChannel) extends AppendFile(fc, Hash.G
 
   /** Insert the key-value pair into hash table. */
   def put(hashedKey: Int, value: Int) {
-    val startBucket = Hash.hashKey(hashedKey)
+    val startBucket = hashKey(hashedKey)
     var bucket = startBucket
     fc.synchronized {
       while (bucket != 0) {
-        for (entry <- 0 until Hash.PER_BUCKET) {
-          buf.position(bucket * Hash.BUCKET_SIZE + entry * Hash.ENTRY_SIZE)
+        for (entry <- 0 until perBucket) {
+          buf.position(bucket * bucketSize + Hash.BUCKET_HEADER_SIZE + entry * Hash.ENTRY_SIZE)
           if (buf.getInt() == Hash.ENTRY_INVALID) {
+            buf.position(buf.position() - 4)
+            buf.putInt(Hash.ENTRY_VALID)
             buf.putInt(hashedKey)
             buf.putInt(value)
             return

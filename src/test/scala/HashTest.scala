@@ -4,15 +4,15 @@ import java.io.RandomAccessFile
 import java.io.File
 
 class HashTest extends FunSuite {
-  def tmpHash(): Hash = {
+  def tmpHash(bits: Int, perBucket: Int): Hash = {
     val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
     tmp.deleteOnExit()
     val raf = new RandomAccessFile(tmp, "rw")
-    return new Hash(raf.getChannel(), 2, 2)
+    return new Hash(raf.getChannel(), bits, perBucket)
   }
 
-  test("put and get (including grow)") {
-    val hash = tmpHash()
+  test("put and get (grow)") {
+    val hash = tmpHash(2, 2)
     hash.put("A".hashCode(), 1)
     hash.put("B".hashCode(), 2)
     hash.put("C".hashCode(), 3)

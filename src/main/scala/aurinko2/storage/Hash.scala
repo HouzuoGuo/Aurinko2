@@ -3,7 +3,7 @@ package aurinko2.storage
 import java.nio.channels.FileChannel
 import java.util.logging.Logger
 import scala.collection.mutable.ListBuffer
-import scala.math.pow
+import scala.math.{ max, pow }
 
 object Hash {
   val GROWTH = 67108864 // Hash file grows by 64MB when full
@@ -15,6 +15,7 @@ object Hash {
 }
 class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBucket: Int)
   extends AppendFile(fc, Hash.GROWTH, pow(2, hashBits).toInt * (Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket)) {
+
   // Size of a bucket full of entries, including bucket header
   val bucketSize = Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket
   def hashKey(key: Int): Int = {
@@ -22,6 +23,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
   }
 
   // Fix append position
+  appendAt = max(appendAt, pow(2, hashBits).toInt * (Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket))
   if (appendAt % bucketSize != 0)
     appendAt += bucketSize - appendAt % bucketSize
 
@@ -32,7 +34,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
   private def next(bucket: Int): Int = {
     at(bucket)
     val nextBucket = buf.getInt()
-    if (nextBucket <= bucket) {
+    if (nextBucket < bucket) {
       Hash.LOG.severe(s"Hash corruption - loop in chain $bucket")
       return 0
     }
@@ -49,18 +51,17 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
 
   /** Position buffer to beginning of the bucket. */
   private def at(bucket: Int) {
-    if (bucket < 0) {
-      Hash.LOG.severe(s"Negative bucket number $bucket")
-    }
+    if (bucket < 0)
+      throw new IllegalArgumentException(s"Negative bucket number $bucket")
+
     buf.position(bucket * bucketSize)
   }
 
   /** Put a new bucket in the bucket chain. */
   private def grow(bucket: Int) {
     fc.synchronized {
-      force()
-      checkGrow(bucketSize)
       at(last(bucket))
+      checkGrow(bucketSize)
       buf.putInt(numberOfBuckets)
       appendAt += bucketSize
     }
@@ -101,7 +102,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
     val startBucket = hashKey(hashedKey)
     var bucket = startBucket
     fc.synchronized {
-      while (bucket != 0) {
+      do {
         for (entry <- 0 until perBucket) {
           buf.position(bucket * bucketSize + Hash.BUCKET_HEADER_SIZE + entry * Hash.ENTRY_SIZE)
           if (buf.getInt() == Hash.ENTRY_INVALID) {
@@ -113,7 +114,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
           }
         }
         bucket = next(bucket)
-      }
+      } while (bucket != 0)
     }
 
     // All buckets are full - make a new bucket and re-put

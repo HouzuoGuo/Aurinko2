@@ -117,9 +117,8 @@ class Collection(override protected val fc: FileChannel) extends AppendFile(fc, 
         if (valid == Collection.DOC_VALID) {
           buf.position(id)
           buf.putInt(0)
-        } else {
-          Collection.LOG.warning(s"No document to delete at $id")
-        }
+        } else
+          throw new IllegalArgumentException(s"No document to delete at $id")
     }
   }
 }

@@ -66,9 +66,6 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
       col.delete(1000000000)
     }
     intercept[IllegalArgumentException] {
-      col.delete(13)
-    }
-    intercept[IllegalArgumentException] {
       col.update(1000000000, "".getBytes())
     }
     intercept[IllegalArgumentException] {

@@ -34,7 +34,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
   private def next(bucket: Int): Int = {
     at(bucket)
     val nextBucket = buf.getInt()
-    if (nextBucket < bucket) {
+    if (nextBucket < bucket && nextBucket != 0) {
       Hash.LOG.severe(s"Hash corruption - loop in chain $bucket")
       return 0
     }
@@ -61,8 +61,8 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
   private def grow(bucket: Int) {
     fc.synchronized {
       at(last(bucket))
-      checkGrow(bucketSize)
       buf.putInt(numberOfBuckets)
+      checkGrow(bucketSize)
       appendAt += bucketSize
     }
   }
@@ -72,8 +72,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
     val startBucket = hashKey(hashedKey)
     val result = new ListBuffer[Tuple2[Int, Int]]()
     var bucket = startBucket
-
-    while (bucket != 0) {
+    do {
       for (entry <- 0 until perBucket) {
         buf.position(bucket * bucketSize + Hash.BUCKET_HEADER_SIZE + entry * Hash.ENTRY_SIZE)
         val entryPos = buf.position()
@@ -87,13 +86,13 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
 
         if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
           Hash.LOG.severe(s"Hash corruption - invalid entry header $entryPos")
-        else if (entryKey == hashedKey && filter(entryKey, value)) {
+        else if (validity == Hash.ENTRY_VALID && entryKey == hashedKey && filter(entryKey, value)) {
           procFun(entryPos)
           result += Tuple2(entryKey, value)
         }
       }
       bucket = next(bucket)
-    }
+    } while (bucket != 0)
     return result.toList
   }
 
@@ -123,7 +122,8 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
   }
 
   /** Return value(s) to which the key is mapped. */
-  def get(hashedKey: Int, limit: Int, filter: (Int, Int) => Boolean) = fc.synchronized { scan(hashedKey, limit, (_: Int) => {}, filter) }
+  def get(hashedKey: Int, limit: Int, filter: (Int, Int) => Boolean) =
+    fc.synchronized { scan(hashedKey, limit, (_: Int) => {}, filter) }
 
   /** Remove key-value pairs. */
   def remove(hashedKey: Int, limit: Int, filter: (Int, Int) => Boolean) = {

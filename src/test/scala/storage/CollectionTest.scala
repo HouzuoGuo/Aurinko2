@@ -1,9 +1,8 @@
 package storage
 
 import org.scalatest.FunSuite
-import java.io.File
-import java.io.RandomAccessFile
-import aurinko2.storage.Collection
+
+import test.TemporaryFactory.collection
 
 class CollectionTest extends FunSuite {
   val doc = """
@@ -19,15 +18,8 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
 """.trim()
   val docBytes = doc.getBytes()
 
-  def tmpCollection(): Collection = {
-    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
-    tmp.deleteOnExit()
-    val raf = new RandomAccessFile(tmp, "rw")
-    return new Collection(raf.getChannel())
-  }
-
   test("insert and read") {
-    val col = tmpCollection()
+    val col = collection
 
     // The collection will have to grow a few times
     for (i <- 0 to 100000)
@@ -35,7 +27,7 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
   }
 
   test("update and read") {
-    val col = tmpCollection()
+    val col = collection
     val docs = Array(col.insert("1".getBytes()), col.insert("2".getBytes()),
       col.insert("A".getBytes()), col.insert("B".getBytes()))
     assert(new String(col.read(col.update(docs(0), "A".getBytes()))).trim().equals("A"))
@@ -47,7 +39,7 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
   }
 
   test("delete and read") {
-    val col = tmpCollection()
+    val col = collection
     val docs = Array(col.insert("1".getBytes()), col.insert("2".getBytes()),
       col.insert("A".getBytes()), col.insert("B".getBytes()))
     col.delete(docs(0))
@@ -59,7 +51,7 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
   }
 
   test("read/insert/update/delete given incorrect ID") {
-    val col = tmpCollection()
+    val col = collection
     col.insert("1".getBytes())
     col.insert("2".getBytes())
     col.insert("A".getBytes())

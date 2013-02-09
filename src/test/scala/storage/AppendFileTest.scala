@@ -1,8 +1,10 @@
 package storage
 
-import org.scalatest.FunSuite
-import java.io.RandomAccessFile
 import java.io.File
+import java.io.RandomAccessFile
+
+import org.scalatest.FunSuite
+
 import aurinko2.storage.Collection
 
 class AppendFileTest extends FunSuite {
@@ -26,9 +28,8 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
     val col = new Collection(raf.getChannel())
 
     // The collection will have to grow a few times
-    for (i <- 0 to 100000) {
+    for (i <- 0 to 100000)
       assert(new String(col.read(col.insert(docBytes))).trim().equals(doc))
-    }
     col.close()
 
     // Re-open it and test insert/read

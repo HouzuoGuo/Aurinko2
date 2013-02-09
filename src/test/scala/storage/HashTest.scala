@@ -1,20 +1,12 @@
 package storage
 
 import org.scalatest.FunSuite
-import aurinko2.storage.Hash
-import java.io.RandomAccessFile
-import java.io.File
+
+import test.TemporaryFactory.hashTable
 
 class HashTest extends FunSuite {
-  def tmpHash(bits: Int, perBucket: Int): Hash = {
-    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
-    tmp.deleteOnExit()
-    val raf = new RandomAccessFile(tmp, "rw")
-    return new Hash(raf.getChannel(), bits, perBucket)
-  }
-
   test("put and get (grow)") {
-    val hash = tmpHash(2, 2)
+    val hash = hashTable(2, 2)
     hash.put("A".hashCode(), 1)
     hash.put("B".hashCode(), 2)
     hash.put("C".hashCode(), 3)
@@ -41,7 +33,7 @@ class HashTest extends FunSuite {
   }
 
   test("remove then get") {
-    val hash = tmpHash(2, 2)
+    val hash = hashTable(2, 2)
     hash.put("A".hashCode(), 1)
     hash.put("B".hashCode(), 2)
     hash.put("C".hashCode(), 3)
@@ -70,11 +62,11 @@ class HashTest extends FunSuite {
     assert(f.sameElements(List(6)))
   }
 
-  test("large put then get") {
-    val hash = tmpHash(12, 100)
-    for (i <- 0 to 100000)
+  test("put and grow") {
+    val hash = hashTable(6, 100)
+    for (i <- 0 to 10000)
       hash.put(i, i)
-    for (i <- 0 to 100000)
+    for (i <- 0 to 10000)
       hash.get(i.hashCode, 1, (_: Int, _2: Int) => { true })
   }
 }

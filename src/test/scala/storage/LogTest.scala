@@ -1,9 +1,12 @@
 package storage
 
-import org.scalatest.FunSuite
-import aurinko2.storage.Log
-import java.io.RandomAccessFile
 import java.io.File
+import java.io.RandomAccessFile
+
+import org.scalatest.FunSuite
+
+import aurinko2.storage.Log
+import test.TemporaryFactory.log
 
 class LogTest extends FunSuite {
   val entry = """
@@ -19,35 +22,28 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
 """.trim()
   val entryBytes = entry.getBytes()
 
-  def tmpLog(): Log = {
-    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
-    tmp.deleteOnExit()
-    val raf = new RandomAccessFile(tmp, "rw")
-    return new Log(raf.getChannel())
-  }
-
   test("insert and read") {
-    val log = tmpLog()
+    val lo = log
     for (i <- 0 to 100000)
-      assert(new String(log.read(log.insert(entryBytes))).trim().equals(entry))
+      assert(new String(lo.read(lo.insert(entryBytes))).trim().equals(entry))
   }
 
   test("read log entry given incorrect ID") {
-    val log = tmpLog()
+    val lo = log
     for (i <- 0 to 1000)
-      log.insert(entryBytes)
+      lo.insert(entryBytes)
     intercept[IllegalArgumentException] {
-      log.read(1000000000) // 1G
+      lo.read(1000000000) // 1G
     }
   }
 
   test("iterate all entries") {
-    val log = tmpLog()
+    val lo = log
     for (i <- 0 until 100000)
-      log.insert(entryBytes)
+      lo.insert(entryBytes)
 
     def allEqual(): Boolean = {
-      log.foreach { e =>
+      lo.foreach { e =>
         if (!new String(e).trim().equals(entry))
           return false
       }

@@ -1,3 +1,5 @@
+package storage
+
 import org.scalatest.FunSuite
 import java.io.File
 import java.io.RandomAccessFile

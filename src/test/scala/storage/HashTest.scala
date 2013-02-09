@@ -1,3 +1,5 @@
+package storage
+
 import org.scalatest.FunSuite
 import aurinko2.storage.Hash
 import java.io.RandomAccessFile

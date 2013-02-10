@@ -18,14 +18,14 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
 
   // Size of a bucket full of entries, including bucket header
   val bucketSize = Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket
-  def hashKey(key: Int): Int = {
-    return key & ((hashBits << 1) - 1)
-  }
 
   // Fix append position
   appendAt = max(appendAt, pow(2, hashBits).toInt * (Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket))
   if (appendAt % bucketSize != 0)
     appendAt += bucketSize - appendAt % bucketSize
+
+  /** Return the last N bits of the integer key. It is used for choosing a bucket when inserting into hash table. */
+  def hashKey(key: Int) = key & ((hashBits << 1) - 1)
 
   /** Return total number of buckets. */
   private def numberOfBuckets = appendAt / bucketSize

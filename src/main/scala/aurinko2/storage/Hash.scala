@@ -67,7 +67,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
     }
   }
 
-  /** Process no more than limited number of entries in the key's bucket chain. Return processed entries. */
+  /** Process no more than a limited number of entries in the key's bucket chain. Return processed entries. */
   private def scan(hashedKey: Int, limit: Int, procFun: Int => Unit, filter: (Int, Int) => Boolean): List[Tuple2[Int, Int]] = {
     val startBucket = hashKey(hashedKey)
     val result = new ListBuffer[Tuple2[Int, Int]]()

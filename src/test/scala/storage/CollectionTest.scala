@@ -21,8 +21,7 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
   test("insert and read") {
     val col = collection
 
-    // The collection will have to grow a few times
-    for (i <- 0 to 100000)
+    for (i <- 0 to 100)
       assert(new String(col.read(col.insert(docBytes))).trim().equals(doc))
   }
 

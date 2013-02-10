@@ -1,11 +1,7 @@
 package storage
 
-import java.io.File
-import java.io.RandomAccessFile
-
 import org.scalatest.FunSuite
 
-import aurinko2.storage.Log
 import test.TemporaryFactory.log
 
 class LogTest extends FunSuite {
@@ -24,13 +20,13 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
 
   test("insert and read") {
     val lo = log
-    for (i <- 0 to 100000)
+    for (i <- 0 to 100)
       assert(new String(lo.read(lo.insert(entryBytes))).trim().equals(entry))
   }
 
   test("read log entry given incorrect ID") {
     val lo = log
-    for (i <- 0 to 1000)
+    for (i <- 0 to 100)
       lo.insert(entryBytes)
     intercept[IllegalArgumentException] {
       lo.read(1000000000) // 1G
@@ -39,7 +35,7 @@ The main Scala testing frameworks (specs2, ScalaCheck, and ScalaTest) provide an
 
   test("iterate all entries") {
     val lo = log
-    for (i <- 0 until 100000)
+    for (i <- 0 until 100)
       lo.insert(entryBytes)
 
     def allEqual(): Boolean = {

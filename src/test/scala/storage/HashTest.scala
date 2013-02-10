@@ -61,12 +61,4 @@ class HashTest extends FunSuite {
     assert(e.sameElements(List(5)))
     assert(f.sameElements(List(6)))
   }
-
-  test("put and grow") {
-    val hash = hashTable(6, 100)
-    for (i <- 0 to 10000)
-      hash.put(i, i)
-    for (i <- 0 to 10000)
-      hash.get(i.hashCode, 1, (_: Int, _2: Int) => { true })
-  }
 }

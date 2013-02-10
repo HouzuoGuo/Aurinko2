@@ -5,12 +5,11 @@ import scala.util.Random
 
 import org.scalatest.FunSuite
 
-import test.TemporaryFactory.collection
-import test.TemporaryFactory.hashTable
+import test.TemporaryFactory.{ collection, hashTable, log }
 import test.TimedExecution.time
 
 class Benchmark extends FunSuite {
-
+  val random = new Random()
   val docBytes = """
 The standard source locations for testing are:
 Scala sources in src/test/scala/
@@ -21,11 +20,10 @@ The resources may be accessed from tests by using the getResource methods of jav
 """.getBytes()
 
   test("hash table storage layer performance benchmark") {
-    val random = new Random()
     val entries = new ArrayBuffer[Int]
     val iterations = 100000
-
     val hash = hashTable(12, 100)
+
     println("Put 100k entries")
     time(iterations) {
       val number = random.nextInt(iterations).hashCode
@@ -39,11 +37,10 @@ The resources may be accessed from tests by using the getResource methods of jav
   }
 
   test("collection storage layer performance benchmark") {
-    val random = new Random()
     val positions = new ArrayBuffer[Int]
     val iterations = 100000
-
     val col = collection
+
     println("Insert 100k documents")
     time(iterations) { positions += col.insert(docBytes) }
     println("Read 100k documents")
@@ -55,6 +52,13 @@ The resources may be accessed from tests by using the getResource methods of jav
   }
 
   test("log storage layer performance benchmark") {
+    val positions = new ArrayBuffer[Int]
+    val iterations = 100000
+    val lo = log
 
+    println("Insert 100k log entries")
+    time(iterations) { positions += lo.insert(docBytes) }
+    println("Read 100k log entries")
+    time(iterations) { lo.read(positions(random.nextInt(iterations))) }
   }
 }

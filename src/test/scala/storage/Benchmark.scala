@@ -21,44 +21,44 @@ The resources may be accessed from tests by using the getResource methods of jav
 
   test("hash table storage layer performance benchmark") {
     val entries = new ArrayBuffer[Int]
-    val iterations = 100000
+    val iterations = 200000
     val hash = hashTable(12, 100)
 
-    println("Put 100k entries")
+    println("Put 200k entries")
     time(iterations) {
       val number = random.nextInt(iterations).hashCode
       entries += number
       hash.put(number, number)
     }
-    println("Get 100k entries")
+    println("Get 200k entries")
     time(iterations) { hash.get(entries(random.nextInt(iterations)), 1, (_1: Int, _2: Int) => { true }) }
-    println("Delete 100k entries")
+    println("Delete 200k entries")
     time(iterations) { hash.remove(entries(random.nextInt(iterations)), 1, (_1: Int, _2: Int) => { true }) }
   }
 
   test("collection storage layer performance benchmark") {
     val positions = new ArrayBuffer[Int]
-    val iterations = 100000
+    val iterations = 200000
     val col = collection
 
-    println("Insert 100k documents")
+    println("Insert 200k documents")
     time(iterations) { positions += col.insert(docBytes) }
-    println("Read 100k documents")
+    println("Read 200k documents")
     time(iterations) { col.read(positions(random.nextInt(iterations))) }
-    println("Update 100k documents")
+    println("Update 200k documents")
     time(iterations) { col.update(positions(random.nextInt(iterations)), docBytes) }
-    println("Delete 100k documents")
+    println("Delete 200k documents")
     time(iterations) { col.delete(positions(random.nextInt(iterations))) }
   }
 
   test("log storage layer performance benchmark") {
     val positions = new ArrayBuffer[Int]
-    val iterations = 100000
+    val iterations = 200000
     val lo = log
 
-    println("Insert 100k log entries")
+    println("Insert 200k log entries")
     time(iterations) { positions += lo.insert(docBytes) }
-    println("Read 100k log entries")
+    println("Read 200k log entries")
     time(iterations) { lo.read(positions(random.nextInt(iterations))) }
   }
 }

@@ -25,7 +25,7 @@ class Hash(override protected val fc: FileChannel, val hashBits: Int, val perBuc
     appendAt += bucketSize - appendAt % bucketSize
 
   /** Return the last N bits of the integer key. It is used for choosing a bucket when inserting into hash table. */
-  def hashKey(key: Int) = key & ((hashBits << 1) - 1)
+  def hashKey(key: Int) = key & ((1 << hashBits) - 1)
 
   /** Return total number of buckets. */
   private def numberOfBuckets = appendAt / bucketSize

@@ -21,7 +21,7 @@ The resources may be accessed from tests by using the getResource methods of jav
 
   test("hash table storage layer performance benchmark") {
     val entries = new ArrayBuffer[Int]
-    val iterations = 200000
+    val iterations = 2000000
     val hash = hashTable(12, 100)
 
     println("Put 200k entries")

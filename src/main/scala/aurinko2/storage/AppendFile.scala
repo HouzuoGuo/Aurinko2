@@ -37,17 +37,13 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
       appendAt += 4
   }
 
-  /** Re-map the file and return true if more room is needed for appending more data. */
-  protected def checkGrow(room: Int): Boolean = {
-    if (room < 1)
-      throw new IllegalArgumentException("room must be > 0")
+  /** Re-map the file and when more room is needed for appending the data of the size. */
+  protected def checkGrow(size: Int) {
+    if (appendAt + size <= buf.limit)
+      return
 
-    if (appendAt + room > buf.limit) {
-      force()
-      buf = fc.map(MapMode.READ_WRITE, 0, buf.limit + growBy)
-      return true
-    }
-    return false
+    force()
+    buf = fc.map(MapMode.READ_WRITE, 0, buf.limit + growBy)
   }
 
   /** Make sure that mapped buffer is written through to storage device. */

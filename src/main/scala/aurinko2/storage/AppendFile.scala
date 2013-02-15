@@ -38,7 +38,7 @@ abstract class AppendFile(protected val fc: FileChannel, protected val growBy: I
   }
 
   /** Re-map the file and return true if more room is needed for appending more data. */
-  def checkGrow(room: Int): Boolean = {
+  protected def checkGrow(room: Int): Boolean = {
     if (room < 1)
       throw new IllegalArgumentException("room must be > 0")
 

@@ -5,7 +5,9 @@ import scala.util.Random
 
 import org.scalatest.FunSuite
 
-import test.TemporaryFactory.{ collection, hashTable, log }
+import test.TemporaryFactory.collection
+import test.TemporaryFactory.hashTable
+import test.TemporaryFactory.log
 import test.TimedExecution.time
 
 class Benchmark extends FunSuite {

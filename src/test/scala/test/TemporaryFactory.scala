@@ -3,7 +3,9 @@ package test
 import java.io.File
 import java.io.RandomAccessFile
 
-import aurinko2.storage.{ Collection, Hash, Log }
+import aurinko2.storage.Collection
+import aurinko2.storage.Hash
+import aurinko2.storage.Log
 
 object TemporaryFactory {
   /** Return a new collection which will be deleted upon JVM termination. */

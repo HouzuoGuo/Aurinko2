@@ -1,16 +1,26 @@
 package aurinko2.storage
 
 import java.nio.channels.FileChannel
-import scala.math.ceil
+
 import scala.collection.mutable.ListBuffer
 
 object Log {
-  val GROWTH = 67108864 // Log file grows 64MB when full
-  val BLOCK_HEADER_SIZE = 8 // Header: time stamp (long)
-  val BLOCK_SIZE = 256 // Entry is separated into blocks of 256 bytes
+
+  /*
+   * Log file grows by 64MB when full.
+   * Log file is made of entries blocks. Blocks of the same timestamp make up a log entry.
+   * Each block consists of:
+   * - block header (long timestamp)
+   * - block content
+   */
+
+  val GROWTH = 67108864
+  val BLOCK_HEADER_SIZE = 8
+  val BLOCK_SIZE = 256
 }
 
 class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GROWTH, Log.GROWTH) {
+
   // Fix append position
   if (appendAt % Log.BLOCK_SIZE != 0)
     appendAt += Log.BLOCK_SIZE - appendAt % Log.BLOCK_SIZE
@@ -25,19 +35,17 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
       data = Array.concat(log, " ".*(Log.BLOCK_SIZE - data.length % Log.BLOCK_SIZE).getBytes())
 
     val entrySize = data.length + (data.length / Log.BLOCK_SIZE) * Log.BLOCK_HEADER_SIZE
-    fc.synchronized {
-      checkGrow(entrySize)
-      id = appendAt
-      val time = System.nanoTime
-      buf.position(appendAt)
+    checkGrow(entrySize)
+    id = appendAt
+    val time = System.nanoTime
+    buf.position(appendAt)
 
-      // Write entry blocks - each block consists of time stamp and data
-      for (slice <- Array.range(0, data.length, Log.BLOCK_SIZE)) {
-        buf.putLong(time)
-        buf.put(data.slice(slice, slice + Log.BLOCK_SIZE))
-      }
-      appendAt += entrySize
+    // Write entry blocks - each block consists of time stamp and data
+    for (slice <- Array.range(0, data.length, Log.BLOCK_SIZE)) {
+      buf.putLong(time)
+      buf.put(data.slice(slice, slice + Log.BLOCK_SIZE))
     }
+    appendAt += entrySize
     return id
   }
 
@@ -48,35 +56,31 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
 
     val slices = new ListBuffer[Array[Byte]]()
     var timestamp = -1L
-    fc.synchronized {
-      buf.position(id)
-      do {
-        // Remember entry's time stamp
-        if (timestamp == -1)
-          timestamp = buf.getLong()
-        val slice = new Array[Byte](Log.BLOCK_SIZE)
+    buf.position(id)
+    do {
 
-        buf.get(slice)
-        slices += slice
+      // Remember entry's time stamp
+      if (timestamp == -1)
+        timestamp = buf.getLong()
+      val slice = new Array[Byte](Log.BLOCK_SIZE)
+      buf.get(slice)
+      slices += slice
 
-        // Keep on reading, until the next entry has a different time stamp
-        // Intentionally using & instead of &&
-      } while (buf.position() < appendAt - Log.BLOCK_HEADER_SIZE & buf.getLong() == timestamp)
-    }
+      // Keep on reading, until the next entry has a different time stamp
+      // Intentionally using & instead of &&
+    } while (buf.position() < appendAt - Log.BLOCK_HEADER_SIZE & buf.getLong() == timestamp)
     return slices.toArray.flatten
   }
 
   /** Iterate through all log entries. */
   def foreach(f: Array[Byte] => Unit) {
-    fc.synchronized {
-      buf.position(0)
+    buf.position(0)
 
-      // While the entry is not empty
-      while (buf.getLong() != 0) {
-        buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
-        f(read(buf.position()))
-        buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
-      }
+    // While the entry is not empty
+    while (buf.getLong() != 0) {
+      buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
+      f(read(buf.position()))
+      buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
     }
   }
 }

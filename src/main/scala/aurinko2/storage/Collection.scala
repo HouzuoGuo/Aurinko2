@@ -3,6 +3,15 @@ package aurinko2.storage
 import java.nio.channels.FileChannel
 import java.util.logging.Logger
 
+import scala.concurrent.Promise
+
+// Workloads
+abstract class CollectionWork
+case class CollectionInsert(doc: Array[Byte], pos: Output[Int]) extends CollectionWork
+case class CollectionUpdate(id: Int, doc: Array[Byte], pos: Output[Int]) extends CollectionWork
+case class CollectionDelete(id: Int) extends CollectionWork
+case class CollectionRead(id: Int, data: Output[Array[Byte]]) extends CollectionWork
+
 object Collection {
   val LOG = Logger.getLogger(classOf[Hash].getName())
 
@@ -26,7 +35,8 @@ class Collection(
   extends AppendFile(
     fc,
     Collection.GROWTH,
-    Collection.GROWTH) {
+    Collection.GROWTH)
+  with WorkSerialized[CollectionWork] {
 
   /** Return document read at the position; return null if the document is no longer valid. */
   def read(id: Int): Array[Byte] = {
@@ -62,14 +72,14 @@ class Collection(
     var id = -1
     val len = doc.length
     val room = len + len * Collection.DOC_PADDING
-    val padding = " ".*(len * Collection.DOC_PADDING).getBytes()
-    id = appendAt
+    val padding =
+      id = appendAt
     checkGrow(room)
     buf.position(appendAt)
     buf.putInt(Collection.DOC_VALID)
     buf.putInt(room)
     buf.put(doc)
-    buf.put(padding)
+    buf.put(" ".*(len * Collection.DOC_PADDING).getBytes())
     appendAt += Collection.DOC_HEADER_SIZE + room
     return id
   }
@@ -122,5 +132,39 @@ class Collection(
         buf.putInt(0)
       } else
         throw new IllegalArgumentException(s"No document to delete at $id")
+  }
+
+  override def workOn(work: CollectionWork, promise: Promise[CollectionWork]) {
+    work match {
+      case CollectionInsert(doc: Array[Byte], output: Output[Int]) =>
+        try {
+          output.data = insert(doc)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+
+      case CollectionUpdate(id: Int, doc: Array[Byte], output: Output[Int]) =>
+        try {
+          output.data = update(id, doc)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case CollectionDelete(id: Int) =>
+        try {
+          delete(id)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case CollectionRead(id: Int, output: Output[Array[Byte]]) =>
+        try {
+          output.data = read(id)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+    }
   }
 }

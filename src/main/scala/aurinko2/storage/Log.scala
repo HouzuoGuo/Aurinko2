@@ -3,6 +3,13 @@ package aurinko2.storage
 import java.nio.channels.FileChannel
 
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.Promise
+
+// Workloads
+abstract class LogWork
+case class LogInsert(log: Array[Byte], pos: Output[Int]) extends LogWork
+case class LogRead(id: Int, data: Output[Array[Byte]]) extends LogWork
+case class LogIterate(f: Array[Byte] => Unit) extends LogWork
 
 object Log {
 
@@ -19,7 +26,13 @@ object Log {
   val BLOCK_SIZE = 256
 }
 
-class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GROWTH, Log.GROWTH) {
+class Log(
+  override protected val fc: FileChannel)
+  extends AppendFile(
+    fc,
+    Log.GROWTH,
+    Log.GROWTH)
+  with WorkSerialized[LogWork] {
 
   // Fix append position
   if (appendAt % Log.BLOCK_SIZE != 0)
@@ -81,6 +94,32 @@ class Log(override protected val fc: FileChannel) extends AppendFile(fc, Log.GRO
       buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
       f(read(buf.position()))
       buf.position(buf.position() - Log.BLOCK_HEADER_SIZE)
+    }
+  }
+
+  override def workOn(work: LogWork, promise: Promise[LogWork]) {
+    work match {
+      case LogInsert(log: Array[Byte], pos: Output[Int]) =>
+        try {
+          pos.data = insert(log)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case LogRead(id: Int, data: Output[Array[Byte]]) =>
+        try {
+          data.data = read(id)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case LogIterate(f: Function1[Array[Byte], Unit]) =>
+        try {
+          foreach(f)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
     }
   }
 }

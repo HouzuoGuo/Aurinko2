@@ -8,6 +8,7 @@ import aurinko2.storage.Hash
 import aurinko2.storage.Log
 
 object TemporaryFactory {
+
   /** Return a new collection which will be deleted upon JVM termination. */
   def collection = {
     val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")

@@ -136,17 +136,17 @@ class Collection(
 
   override def workOn(work: CollectionWork, promise: Promise[CollectionWork]) {
     work match {
-      case CollectionInsert(doc: Array[Byte], output: Output[Int]) =>
+      case CollectionInsert(doc: Array[Byte], pos: Output[Int]) =>
         try {
-          output.data = insert(doc)
+          pos.data = insert(doc)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
 
-      case CollectionUpdate(id: Int, doc: Array[Byte], output: Output[Int]) =>
+      case CollectionUpdate(id: Int, doc: Array[Byte], pos: Output[Int]) =>
         try {
-          output.data = update(id, doc)
+          pos.data = update(id, doc)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
@@ -158,9 +158,9 @@ class Collection(
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case CollectionRead(id: Int, output: Output[Array[Byte]]) =>
+      case CollectionRead(id: Int, data: Output[Array[Byte]]) =>
         try {
-          output.data = read(id)
+          data.data = read(id)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)

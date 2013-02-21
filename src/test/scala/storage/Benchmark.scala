@@ -11,6 +11,7 @@ import test.TemporaryFactory.log
 import test.TimedExecution.time
 
 class Benchmark extends FunSuite {
+
   val random = new Random()
   val docBytes = """
 The standard source locations for testing are:

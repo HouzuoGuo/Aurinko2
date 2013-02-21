@@ -4,7 +4,16 @@ import java.nio.channels.FileChannel
 import java.util.logging.Logger
 
 import scala.collection.mutable.ListBuffer
-import scala.math.{ max, pow }
+import scala.concurrent.Promise
+import scala.math.max
+import scala.math.pow
+
+// Workloads
+abstract class HashWork
+case class HashGet(key: Int, limit: Int, filter: (Int, Int) => Boolean,
+  result: Output[List[Tuple2[Int, Int]]]) extends HashWork
+case class HashPut(key: Int, value: Int) extends HashWork
+case class HashRemove(key: Int, limit: Int, filter: (Int, Int) => Boolean) extends HashWork
 
 object Hash {
   val LOG = Logger.getLogger(classOf[Hash].getName())
@@ -28,7 +37,8 @@ class Hash(
   val perBucket: Int)
   extends AppendFile(
     fc,
-    Hash.GROWTH, pow(2, hashBits).toInt * (Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket)) {
+    Hash.GROWTH, pow(2, hashBits).toInt * (Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket))
+  with WorkSerialized[HashWork] {
 
   // Size of a bucket full of entries, including bucket header
   val bucketSize = Hash.BUCKET_HEADER_SIZE + Hash.ENTRY_SIZE * perBucket
@@ -132,5 +142,32 @@ class Hash(
     scan(key, limit,
       (pos: Int) => { buf.position(pos); buf.putInt(Hash.ENTRY_INVALID) },
       filter)
+  }
+
+  override def workOn(work: HashWork, promise: Promise[HashWork]) {
+    work match {
+      case HashGet(key: Int, limit: Int, filter: Function2[Int, Int, Boolean],
+        result: Output[List[Tuple2[Int, Int]]]) =>
+        try {
+          result.data = get(key, limit, filter)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case HashPut(key: Int, value: Int) =>
+        try {
+          put(key, value)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case HashRemove(key: Int, limit: Int, filter: Function2[Int, Int, Boolean]) =>
+        try {
+          remove(key, limit, filter)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+    }
   }
 }

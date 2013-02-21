@@ -1,6 +1,7 @@
 package test
 
 object TimedExecution {
+
   def time(times: Int)(func: => Unit) {
     val start = System.currentTimeMillis()
     for (i <- 1 to times)

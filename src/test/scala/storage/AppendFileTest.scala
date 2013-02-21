@@ -8,6 +8,7 @@ import org.scalatest.FunSuite
 import aurinko2.storage.Collection
 
 class AppendFileTest extends FunSuite {
+
   val doc = """
 The standard source locations for testing are:
 Scala sources in src/test/scala/

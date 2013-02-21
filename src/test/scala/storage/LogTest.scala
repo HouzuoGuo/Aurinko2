@@ -5,6 +5,7 @@ import org.scalatest.FunSuite
 import test.TemporaryFactory.log
 
 class LogTest extends FunSuite {
+
   val entry = """
 The standard source locations for testing are:
 Scala sources in src/test/scala/

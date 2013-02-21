@@ -5,6 +5,7 @@ import org.scalatest.FunSuite
 import test.TemporaryFactory.hashTable
 
 class HashTest extends FunSuite {
+
   test("put and get (with bucket grow)") {
     val hash = hashTable(2, 2)
     hash.put("A".hashCode(), 1)

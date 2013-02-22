@@ -11,11 +11,14 @@ import aurinko2.storage.CollectionInsert
 import aurinko2.storage.Hash
 import aurinko2.storage.Output
 import aurinko2.storage.CollectionRead
+import aurinko2.storage.CollectionUpdate
 
 class Collection(val path: String) {
 
+  private val writeLock = new Object();
+
   // Open collection
-  val hash = new HashMap[Seq[String], Hash]
+  val hashes = new HashMap[Seq[String], Hash]
   val collection = new CollFile(new RandomAccessFile(path, "rw").getChannel())
 
   // Index management
@@ -37,19 +40,36 @@ class Collection(val path: String) {
 
   def insert(doc: Elem, wait: Boolean = false): Int = {
     val work = CollectionInsert(doc.toString.getBytes(), new Output[Int](0))
-    val p = collection.offer(work)
-    if (!wait)
-      return -1
+    writeLock.synchronized {
+      val p = collection.offer(work)
+      if (!wait)
+        return -1
 
-    Await.result(p.future, Long.MaxValue second)
-    return work.pos.data
+      Await.result(p.future, Long.MaxValue second)
+      return work.pos.data
+    }
   }
 
   def update(id: Int, doc: Elem, wait: Boolean = false): Int = {
-    0
+    val work = CollectionUpdate(id, doc.toString.getBytes(), new Output[Int](0))
+    writeLock.synchronized {
+      val p = collection.offer(work)
+      if (!wait)
+        return -1
+
+      Await.result(p.future, Long.MaxValue second)
+      return work.pos.data
+    }
   }
 
   def delete(id: Int, wait: Boolean = false) = {
+
+  }
+
+  def save() {
+  }
+
+  def close() {
 
   }
 }

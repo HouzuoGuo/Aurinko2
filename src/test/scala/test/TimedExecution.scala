@@ -1,4 +1,4 @@
-package test
+package aurinko2.test
 
 object TimedExecution {
 

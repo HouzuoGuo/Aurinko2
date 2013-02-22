@@ -1,3 +1,5 @@
+package aurinko2.test.storage
+
 import org.scalatest.FunSuite
 
 import TemporaryFactory.log

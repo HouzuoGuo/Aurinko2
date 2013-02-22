@@ -1,3 +1,5 @@
+package aurinko2.test.storage
+
 import org.scalatest.FunSuite
 
 import TemporaryFactory.hashTable
@@ -16,19 +18,12 @@ class HashTest extends FunSuite {
     hash.put("B".hashCode(), 8)
     hash.put("B".hashCode(), 9)
 
-    val a = hash.get("A".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val b = hash.get("B".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val c = hash.get("C".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val d = hash.get("D".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val e = hash.get("E".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val f = hash.get("F".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-
-    assert(a.sameElements(List(1, 7)))
-    assert(b.sameElements(List(2, 8, 9)))
-    assert(c.sameElements(List(3)))
-    assert(d.sameElements(List(4)))
-    assert(e.sameElements(List(5)))
-    assert(f.sameElements(List(6)))
+    assert(hash.get("A".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(1, 7))
+    assert(hash.get("B".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(2, 8, 9))
+    assert(hash.get("C".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(3))
+    assert(hash.get("D".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(4))
+    assert(hash.get("E".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(5))
+    assert(hash.get("F".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(6))
   }
 
   test("remove then get") {
@@ -46,18 +41,11 @@ class HashTest extends FunSuite {
     hash.remove("A".hashCode(), -1, (i1: Int, i2: Int) => { i2 > 5 })
     hash.remove("B".hashCode(), 2, (i1: Int, i2: Int) => { true })
 
-    val a = hash.get("A".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val b = hash.get("B".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val c = hash.get("C".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val d = hash.get("D".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val e = hash.get("E".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-    val f = hash.get("F".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 }
-
-    assert(a.sameElements(List(1)))
-    assert(b.sameElements(List(9)))
-    assert(c.sameElements(List(3)))
-    assert(d.sameElements(List(4)))
-    assert(e.sameElements(List(5)))
-    assert(f.sameElements(List(6)))
+    assert(hash.get("A".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(1))
+    assert(hash.get("B".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(9))
+    assert(hash.get("C".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(3))
+    assert(hash.get("D".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(4))
+    assert(hash.get("E".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(5))
+    assert(hash.get("F".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(6))
   }
 }

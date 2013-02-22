@@ -1,3 +1,5 @@
+package aurinko2.test.storage
+
 import java.io.File
 import java.io.RandomAccessFile
 

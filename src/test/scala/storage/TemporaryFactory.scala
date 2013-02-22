@@ -1,3 +1,5 @@
+package aurinko2.test.storage
+
 import java.io.File
 import java.io.RandomAccessFile
 
@@ -9,21 +11,21 @@ object TemporaryFactory {
 
   /** Return a new collection which will be deleted upon JVM termination. */
   def collection = {
-    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
+    val tmp = File.createTempFile("Aurinko2", System.nanoTime().toString)
     tmp.deleteOnExit()
     new Collection((new RandomAccessFile(tmp, "rw")).getChannel())
   }
 
   /** Return a new hash table which will be deleted upon JVM termination. */
   def hashTable(bits: Int, perBucket: Int) = {
-    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
+    val tmp = File.createTempFile("Aurinko2", System.nanoTime().toString)
     tmp.deleteOnExit()
     new Hash((new RandomAccessFile(tmp, "rw")).getChannel(), bits, perBucket)
   }
 
   /** Return a log structure which will be deleted upon JVM termination. */
   def log: Log = {
-    val tmp = File.createTempFile(System.nanoTime().toString, "Aurinko2")
+    val tmp = File.createTempFile("Aurinko2", System.nanoTime().toString)
     tmp.deleteOnExit()
     return new Log(new RandomAccessFile(tmp, "rw").getChannel())
   }

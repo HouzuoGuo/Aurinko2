@@ -1,8 +1,6 @@
-package storage
-
 import org.scalatest.FunSuite
 
-import test.TemporaryFactory.collection
+import TemporaryFactory.collection
 
 class CollectionTest extends FunSuite {
 

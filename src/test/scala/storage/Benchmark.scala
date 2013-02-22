@@ -1,13 +1,11 @@
-package storage
-
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
 
 import org.scalatest.FunSuite
 
-import test.TemporaryFactory.collection
-import test.TemporaryFactory.hashTable
-import test.TemporaryFactory.log
+import TemporaryFactory.collection
+import TemporaryFactory.hashTable
+import TemporaryFactory.log
 import test.TimedExecution.time
 
 class Benchmark extends FunSuite {

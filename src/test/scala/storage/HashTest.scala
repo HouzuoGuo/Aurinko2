@@ -1,8 +1,6 @@
-package storage
-
 import org.scalatest.FunSuite
 
-import test.TemporaryFactory.hashTable
+import TemporaryFactory.hashTable
 
 class HashTest extends FunSuite {
 

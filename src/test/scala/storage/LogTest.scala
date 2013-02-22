@@ -1,8 +1,6 @@
-package storage
-
 import org.scalatest.FunSuite
 
-import test.TemporaryFactory.log
+import TemporaryFactory.log
 
 class LogTest extends FunSuite {
 

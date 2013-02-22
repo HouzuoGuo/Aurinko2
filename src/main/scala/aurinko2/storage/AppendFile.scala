@@ -2,8 +2,12 @@ package aurinko2.storage
 
 import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
-
 import scala.math.max
+import java.util.logging.Logger
+
+object AppendFile {
+  val LOG = Logger.getLogger(classOf[AppendFile].getName())
+}
 
 abstract class AppendFile(
   protected val fc: FileChannel,
@@ -39,13 +43,14 @@ abstract class AppendFile(
   else if (int1 != 0)
     appendAt += 4
 
+  AppendFile.LOG.info(s"File is opened, append position is at $appendAt")
+
   /** Re-map the file if more room is needed for appending the size of data. */
   protected def checkGrow(size: Int) {
-    if (size < 1)
-      throw new IllegalArgumentException("room must be > 0")
     if (appendAt + size <= buf.limit)
       return
 
+    AppendFile.LOG.info(s"Append position is at $appendAt. File is grown by $growBy because there is not enough room for $size bytes.")
     force()
     buf = fc.map(MapMode.READ_WRITE, 0, buf.limit + growBy)
   }

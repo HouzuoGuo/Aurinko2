@@ -48,6 +48,8 @@ class Hash(
   if (appendAt % bucketSize != 0)
     appendAt += bucketSize - appendAt % bucketSize
 
+  Hash.LOG.info(s"Hash table file is opened. Bucket size is $bucketSize, initial file size is ${minSize}")
+
   /** Return the last N bits of the integer key. It is used for choosing a bucket when inserting into hash table. */
   def hashKey(key: Int) = key & ((1 << hashBits) - 1)
 
@@ -59,7 +61,7 @@ class Hash(
     buf.position(bucket * bucketSize)
     val nextBucket = buf.getInt()
     if (nextBucket < bucket && nextBucket != 0) {
-      Hash.LOG.severe(s"Hash corruption - loop in chain $bucket")
+      Hash.LOG.severe(s"bucket chain $bucket is a loop - repair collection?")
       return 0
     }
     return nextBucket
@@ -75,6 +77,7 @@ class Hash(
 
   /** Put a new bucket in the bucket chain. */
   private def grow(bucket: Int) {
+    Hash.LOG.info(s"Growing a bucket in chain $bucket, new bucket's number is ${numberOfBuckets}")
     buf.position(last(bucket) * bucketSize)
     buf.putInt(numberOfBuckets)
     checkGrow(bucketSize)

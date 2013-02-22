@@ -1,5 +1,0 @@
-package logic
-
-class TemporaryFactory {
-
-}

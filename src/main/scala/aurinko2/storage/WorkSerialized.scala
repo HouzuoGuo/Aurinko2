@@ -2,18 +2,16 @@ package aurinko2.storage
 
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
-
 import scala.concurrent.Promise
 import scala.concurrent.promise
+import java.util.logging.Logger
 
 /** A class with a mutable value. */
 case class Output[T](var data: T)
-
 /**
  * Serialized work loads.
  */
 trait WorkSerialized[I] {
-
   private val queue = new LinkedBlockingQueue[Tuple2[I, Promise[I]]]
 
   /** Add an item to the work queue. */

@@ -41,7 +41,7 @@ class Collection(
   /** Return document read at the position; return null if the document is no longer valid. */
   def read(id: Int): Array[Byte] = {
     if (id > appendAt)
-      throw new IllegalArgumentException(s"Document ID $id is out of range")
+      throw new IllegalArgumentException(s"Document $id does not exist")
 
     buf.position(id)
     val valid = buf.getInt()
@@ -50,13 +50,13 @@ class Collection(
 
     // Not a document header?
     if (valid != Collection.DOC_VALID)
-      throw new IllegalArgumentException(s"There is no document at $id")
+      throw new IllegalArgumentException(s"Document $id does not exist")
 
     val room = buf.getInt()
 
     // Possible document header corruption, better repair the collection
     if (room > Collection.MAX_DOC_ROOM) {
-      Collection.LOG.severe(s"Document corruption $id")
+      Collection.LOG.severe(s"Document $id has a header corruption - repair collection?")
       return null
     }
     val data = Array.ofDim[Byte](room)
@@ -67,7 +67,7 @@ class Collection(
   /** Insert a document; return inserted document ID. */
   def insert(doc: Array[Byte]): Int = {
     if (doc.length > Collection.MAX_DOC_SIZE)
-      throw new IllegalArgumentException("Document " + new String(doc) + " exceeds MAX_DOC_SIZE")
+      throw new IllegalArgumentException(s"Document is too large, it exceeds ${Collection.MAX_DOC_SIZE}")
 
     var id = -1
     val len = doc.length
@@ -87,9 +87,9 @@ class Collection(
   /** Update a document; return updated document ID. */
   def update(id: Int, doc: Array[Byte]): Int = {
     if (doc.length > Collection.MAX_DOC_ROOM)
-      throw new IllegalArgumentException("Document " + new String(doc) + " exceeds MAX_DOC_ROOM")
+      throw new IllegalArgumentException(s"Document is too large, it exceeds ${Collection.MAX_DOC_ROOM}")
     if (id > appendAt)
-      throw new IllegalArgumentException(s"There is no document at $id")
+      throw new IllegalArgumentException(s"Document $id does not exist")
 
     val len = doc.length
     buf.position(id)
@@ -99,13 +99,13 @@ class Collection(
 
     // Not a document header?
     if (valid != Collection.DOC_VALID)
-      throw new IllegalArgumentException(s"There is no document at $id")
+      throw new IllegalArgumentException(s"Document $id does not exist")
 
     val room = buf.getInt()
 
     // Not a document / document header corruption?
     if (room > Collection.MAX_DOC_ROOM) {
-      Collection.LOG.severe(s"Document corruption $id")
+      Collection.LOG.severe(s"Document $id has a header corruption - repair collection?")
       return id
     }
 
@@ -122,7 +122,7 @@ class Collection(
   /** Delete a document. */
   def delete(id: Int) {
     if (id > appendAt)
-      throw new IllegalArgumentException(s"Document ID $id is out of range")
+      throw new IllegalArgumentException(s"Document $id does not exist")
 
     buf.position(id)
     val valid = buf.getInt()
@@ -131,7 +131,7 @@ class Collection(
         buf.position(id)
         buf.putInt(0)
       } else
-        throw new IllegalArgumentException(s"No document to delete at $id")
+        throw new IllegalArgumentException(s"Document $id does not exist")
   }
 
   override def workOn(work: CollectionWork, promise: Promise[CollectionWork]) {

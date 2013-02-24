@@ -24,5 +24,15 @@ class CollectionTest extends FunSuite {
     // Delete
     col.delete(pos(2), true)
     assert(col.read(pos(2)) == null)
+
+    // Update at invalid ID
+    intercept[IllegalArgumentException] {
+      col.update(1000000000, <abc></abc>, true)
+    }
+
+    // Delete at invalid ID
+    intercept[IllegalArgumentException] {
+      col.delete(1000000000, true)
+    }
   }
 }

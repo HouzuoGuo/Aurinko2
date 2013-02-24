@@ -46,7 +46,7 @@ class Collection(val path: String) {
       throw new Exception(s"Collection does not have config file and failed to create $path/config")
     else {
       SimpleIO.appendLines(configFile.getAbsolutePath(), Seq("<root></root>"))
-      Collection.LOG.info(s"Config file $path/config hass been created with only a root element")
+      Collection.LOG.info(s"Config file $path/config has been created with only a root element")
     }
 
   var config: Elem = null
@@ -107,7 +107,7 @@ class Collection(val path: String) {
     return loadString(new String(work.data.data))
   }
 
-  /** Insert a document, return its ID. */
+  /** Insert a document, return its ID or -1 if non-blocking. */
   def insert(doc: Elem, wait: Boolean = false): Int = {
     val work = CollectionInsert(doc.toString.getBytes(), new Output[Int](0))
     writeLock.synchronized {
@@ -120,7 +120,7 @@ class Collection(val path: String) {
     }
   }
 
-  /** Update a document given its ID and new document element, return updated document's ID. */
+  /** Update a document given its ID and new document element, return updated document's ID or -1 if non-blocking. */
   def update(id: Int, doc: Elem, wait: Boolean = false): Int = {
     val work = CollectionUpdate(id, doc.toString.getBytes(), new Output[Int](0))
     writeLock.synchronized {

@@ -19,4 +19,15 @@ object SimpleIO {
     writer.write(lines.mkString("\n"))
     writer.close()
   }
+
+  /** Remove a directory and everything underneath it.*/
+  def rmrf(dir: File) {
+    if (dir.isFile())
+      dir.delete()
+    else {
+      for (file <- dir.listFiles())
+        rmrf(file)
+      dir.delete()
+    }
+  }
 }

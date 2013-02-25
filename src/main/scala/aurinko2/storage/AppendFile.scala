@@ -50,7 +50,7 @@ abstract class AppendFile(
     if (appendAt + size <= buf.limit)
       return
 
-    AppendFile.LOG.info(s"Append position is at $appendAt. File is grown by $growBy because there is not enough room for $size bytes.")
+    AppendFile.LOG.info(s"Append position is at $appendAt. File is grown by $growBy bytes because there is not enough room for $size bytes.")
     force()
     buf = fc.map(MapMode.READ_WRITE, 0, buf.limit + growBy)
   }

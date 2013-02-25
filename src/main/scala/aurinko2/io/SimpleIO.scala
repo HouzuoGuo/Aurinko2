@@ -7,15 +7,17 @@ import java.io.IOException
 
 object SimpleIO {
 
-  /** Append the lines to the destination file. Create the file if it does not exist. */
-  def appendLines(filename: String, lines: Seq[String]) {
+  /** Overwrite or append the lines to the destination file. Create the file if it does not exist. */
+  def spit(filename: String, lines: Seq[String], append: Boolean = false) {
     val file = new File(filename)
     if (!file.exists())
       if (!file.createNewFile())
         throw new IOException(s"Cannot create file $filename")
+
     if (!file.canWrite())
       throw new IOException(s"You do not have permission to write to $filename")
-    val writer = new BufferedWriter(new FileWriter(file, true))
+
+    val writer = new BufferedWriter(new FileWriter(file, append))
     writer.write(lines.mkString("\n"))
     writer.close()
   }

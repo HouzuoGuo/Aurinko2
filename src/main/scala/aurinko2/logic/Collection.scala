@@ -12,8 +12,8 @@ import scala.xml.Elem
 import scala.xml.XML
 import scala.xml.XML.loadString
 
-import aurinko2.io.SimpleIO
-import aurinko2.storage.{ Collection => CollFile }
+import aurinko2.io.SimpleIO.spit
+import aurinko2.storage.{Collection => CollFile}
 import aurinko2.storage.CollectionDelete
 import aurinko2.storage.CollectionInsert
 import aurinko2.storage.CollectionRead
@@ -28,6 +28,9 @@ object Collection {
 
 class Collection(val path: String) {
 
+  private val writeLock = new Object()
+  private val configFilename = Paths.get(path, "config").toString
+
   Collection.LOG.info(s"Opening collection $path")
 
   private val testOpen = new File(path)
@@ -37,17 +40,19 @@ class Collection(val path: String) {
     throw new Exception(s"Collection directory $path does not exist or is not RWX to you")
   }
 
-  private val writeLock = new Object();
-
   // Load configuration file
-  val configFile = new File(Paths.get(path, "config").toString)
+  val configFile = new File(configFilename)
+
   if (!configFile.exists())
     if (!configFile.createNewFile())
       throw new Exception(s"Collection does not have config file and failed to create $path/config")
     else {
-      SimpleIO.appendLines(configFile.getAbsolutePath(), Seq("<root></root>"))
-      Collection.LOG.info(s"Config file $path/config has been created with only a root element")
+      spit(configFile.getAbsolutePath(), Seq("<root></root>"))
+      Collection.LOG.info(s"Empty config file $path/config has been created")
     }
+
+  if (!(configFile.canRead() && configFile.canWrite()))
+    throw new Exception(s"Config file $configFilename is not RW to you")
 
   var config: Elem = null
   try {
@@ -58,42 +63,64 @@ class Collection(val path: String) {
   }
 
   // Load hash indexes
-  val hashes = new HashMap[Seq[String], Hash]
+  val hashes = new HashMap[Seq[String], Tuple2[String, Hash]]
   if (config != null)
-    for (hash <- config \ "hashes") {
+    (config \ "hashes").foreach { hash =>
       hash.attribute("file") match {
         case Some(filename) =>
           Collection.LOG.info(s"Loading hash index $filename")
           hashes.put(((hash \ "path").map { _.text }).toSeq,
-            new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(),
-              hash.attribute("bits") match {
-                case Some(bits) =>
-                  bits.toString.toInt
-                case None =>
-                  Collection.LOG.warning("No number of hash bits defined - using default 12")
-                  12
-              }, hash.attribute("entries") match {
-                case Some(entries) =>
-                  entries.toString.toInt
-                case None =>
-                  Collection.LOG.warning("No number of hash bits defined - using default 100")
-                  100
-              }))
+            (filename.toString,
+              new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(),
+                hash.attribute("bits") match {
+                  case Some(bits) =>
+                    bits.toString.toInt
+                  case None =>
+                    Collection.LOG.warning("No number of hash bits defined - using default 12")
+                    12
+                }, hash.attribute("per_bucket") match {
+                  case Some(entries) =>
+                    entries.toString.toInt
+                  case None =>
+                    Collection.LOG.warning("No number of hash bits defined - using default 100")
+                    100
+                })))
         case None =>
           Collection.LOG.severe("An index exists in configuration file but without a file name. It is skipped.")
       }
     }
+
   val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data").toString, "rw").getChannel())
   val log = new Log(new RandomAccessFile(Paths.get(path, "log").toString, "rw").getChannel())
 
   Collection.LOG.info(s"Successfully loaded collection $path")
 
   // Index management
-  def index(path: Seq[String]) {
+  def index(path: Seq[String], bits: Int, perBucket: Int) {
+    if (hashes.contains(path))
+      throw new Exception(s"Collection ${this.path} already has $path indexed")
+
+    val last = path(path.size - 1)
+    if (last.length() > 100)
+      throw new Exception(s"Last path segment ($last) is too long (> 100 characters)")
+
+    val filename = last + System.nanoTime().toString
+    hashes += ((path, (filename, new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket))))
+    saveConfig()
   }
 
   def unindex(path: Seq[String]) {
+    if (!hashes.contains(path))
+      throw new Exception(s"Collection ${this.path} does not have $path indexed")
 
+    val filename = hashes(path)._1
+    if (!new File(filename).delete()) {
+      Collection.LOG.severe(s"Cannot delete index file $filename")
+      throw new Exception(s"Cannot delete index file $filename")
+    }
+
+    hashes -= path
+    saveConfig()
   }
 
   // Document management
@@ -144,12 +171,40 @@ class Collection(val path: String) {
     }
   }
 
+  // Configuration and other
+
+  def saveConfig() {
+
+    // Copy existing config to .bak
+    val source = scala.io.Source.fromFile("file.txt")
+    spit(Paths.get(path, "config.bak").toString, Seq(source.mkString), false)
+    source.close()
+
+    // Overwrite current config file
+    spit(configFilename,
+      Seq(<root>{
+        hashes.map {
+          hash =>
+            <hash file={ hash._2._1 } bits={ hash._2._2.hashBits.toString } per_bucket={ hash._2._2.perBucket.toString }>
+              {
+                hash._1.map { segment =>
+                  <path>
+                    { segment }
+                  </path>
+                }
+              }
+            </hash>
+        }
+      }</root>.toString),
+      false)
+  }
+
   /** Flush all collection changes to disk. */
   def save() {
     log.force()
     collection.force()
     for (hash <- hashes)
-      hash._2.force()
+      hash._2._2.force()
     Collection.LOG.info(s"Collection $path saved at ${System.currentTimeMillis()}")
   }
 
@@ -158,7 +213,7 @@ class Collection(val path: String) {
     log.close()
     collection.close()
     for (hash <- hashes)
-      hash._2.close()
+      hash._2._2.close()
     Collection.LOG.info(s"Collection $path closed at ${System.currentTimeMillis()}")
   }
 }

@@ -4,16 +4,15 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Paths
 import java.util.logging.Logger
-
+import java.util.concurrent.locks.ReentrantLock
 import scala.collection.mutable.HashMap
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationLong
 import scala.xml.Elem
 import scala.xml.XML
 import scala.xml.XML.loadString
-
 import aurinko2.io.SimpleIO.spit
-import aurinko2.storage.{Collection => CollFile}
+import aurinko2.storage.{ Collection => CollFile }
 import aurinko2.storage.CollectionDelete
 import aurinko2.storage.CollectionInsert
 import aurinko2.storage.CollectionRead
@@ -21,6 +20,10 @@ import aurinko2.storage.CollectionUpdate
 import aurinko2.storage.Hash
 import aurinko2.storage.Log
 import aurinko2.storage.Output
+import aurinko2.storage.LogInsert
+import aurinko2.storage.HashPut
+import scala.xml.NodeSeq
+import scala.collection.mutable.ListBuffer
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -28,11 +31,12 @@ object Collection {
 
 class Collection(val path: String) {
 
-  private val writeLock = new Object()
+  private val write = new ReentrantLock()
   private val configFilename = Paths.get(path, "config").toString
 
   Collection.LOG.info(s"Opening collection $path")
 
+  // Test open collection directory
   private val testOpen = new File(path)
 
   if (!(testOpen.exists() && testOpen.isDirectory() &&
@@ -70,17 +74,17 @@ class Collection(val path: String) {
         case Some(filename) =>
           Collection.LOG.info(s"Loading hash index $filename")
           hashes.put(((hash \ "path").map { _.text }).toSeq,
-            (filename.toString,
-              new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(),
+            (filename.text,
+              new Hash(new RandomAccessFile(filename.text, "rw").getChannel(),
                 hash.attribute("bits") match {
                   case Some(bits) =>
-                    bits.toString.toInt
+                    bits.text.toInt
                   case None =>
                     Collection.LOG.warning("No number of hash bits defined - using default 12")
                     12
                 }, hash.attribute("per_bucket") match {
                   case Some(entries) =>
-                    entries.toString.toInt
+                    entries.text.toInt
                   case None =>
                     Collection.LOG.warning("No number of hash bits defined - using default 100")
                     100
@@ -125,6 +129,21 @@ class Collection(val path: String) {
 
   // Document management
 
+  def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
+    nodes(0).descendant
+    if (path.size == 0) {
+      return (nodes map { node => node.toString }).toList
+    } else {
+      val ret = new ListBuffer[String]
+      path match {
+        case first :: rest =>
+          nodes foreach { node => ret ++= getIn(node \ first, rest) }
+        case Nil =>
+      }
+      return ret.toList
+    }
+  }
+
   /** Read a document given document ID, return the read document, or <code>null</code> if the document is no longer valid. */
   def read(id: Int): Elem = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
@@ -136,38 +155,51 @@ class Collection(val path: String) {
 
   /** Insert a document, return its ID or -1 if non-blocking. */
   def insert(doc: Elem, wait: Boolean = false): Int = {
-    val work = CollectionInsert(doc.toString.getBytes(), new Output[Int](0))
-    writeLock.synchronized {
-      val p = collection.offer(work)
+    val docBytes = doc.toString.getBytes
+    val colInsert = CollectionInsert(docBytes, new Output[Int](0))
+    write.lock()
+    try {
+
+      // Insert document first
+      val p1 = collection.offer(colInsert)
+      Await.result(p1.future, Int.MaxValue nanosecond)
+
       if (!wait)
         return -1
 
-      Await.result(p.future, Int.MaxValue nanosecond)
-      return work.pos.data
+      return colInsert.pos.data
+    } finally {
+      write.unlock()
     }
   }
 
   /** Update a document given its ID and new document element, return updated document's ID or -1 if non-blocking. */
   def update(id: Int, doc: Elem, wait: Boolean = false): Int = {
-    val work = CollectionUpdate(id, doc.toString.getBytes(), new Output[Int](0))
-    writeLock.synchronized {
+    val work = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
+    write.lock()
+    try {
       val p = collection.offer(work)
       if (!wait)
         return -1
 
       Await.result(p.future, Int.MaxValue nanosecond)
       return work.pos.data
+    } finally {
+      write.unlock()
     }
   }
 
   /** Delete a document given its ID. */
   def delete(id: Int, wait: Boolean = false) {
     val work = CollectionDelete(id)
-    writeLock.synchronized {
+    write.lock()
+    try {
       val p = collection.offer(work)
       if (!wait)
         return
       Await.result(p.future, Int.MaxValue nanosecond)
+    } finally {
+      write.unlock()
     }
   }
 
@@ -203,8 +235,7 @@ class Collection(val path: String) {
   def save() {
     log.force()
     collection.force()
-    for (hash <- hashes)
-      hash._2._2.force()
+    hashes foreach { _._2._2.force() }
     Collection.LOG.info(s"Collection $path saved at ${System.currentTimeMillis()}")
   }
 
@@ -212,8 +243,7 @@ class Collection(val path: String) {
   def close() {
     log.close()
     collection.close()
-    for (hash <- hashes)
-      hash._2._2.close()
+    hashes foreach { _._2._2.force() }
     Collection.LOG.info(s"Collection $path closed at ${System.currentTimeMillis()}")
   }
 }

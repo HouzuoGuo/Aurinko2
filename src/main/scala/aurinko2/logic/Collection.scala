@@ -7,6 +7,7 @@ import java.util.logging.Logger
 import java.util.concurrent.locks.ReentrantLock
 import scala.collection.mutable.HashMap
 import scala.concurrent.Await
+import scala.concurrent.Promise
 import scala.concurrent.duration.DurationLong
 import scala.xml.Elem
 import scala.xml.XML
@@ -18,12 +19,15 @@ import aurinko2.storage.CollectionInsert
 import aurinko2.storage.CollectionRead
 import aurinko2.storage.CollectionUpdate
 import aurinko2.storage.Hash
+import aurinko2.storage.HashWork
+import aurinko2.storage.HashPut
 import aurinko2.storage.Log
 import aurinko2.storage.Output
 import aurinko2.storage.LogInsert
 import aurinko2.storage.HashPut
 import scala.xml.NodeSeq
 import scala.collection.mutable.ListBuffer
+import aurinko2.storage.LogInsert
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -67,13 +71,13 @@ class Collection(val path: String) {
   }
 
   // Load hash indexes
-  val hashes = new HashMap[Seq[String], Tuple2[String, Hash]]
+  val hashes = new HashMap[List[String], Tuple2[String, Hash]]
   if (config != null)
     (config \ "hashes").foreach { hash =>
       hash.attribute("file") match {
         case Some(filename) =>
           Collection.LOG.info(s"Loading hash index $filename")
-          hashes.put(((hash \ "path").map { _.text }).toSeq,
+          hashes.put(((hash \ "path").map { _.text }).toList,
             (filename.text,
               new Hash(new RandomAccessFile(filename.text, "rw").getChannel(),
                 hash.attribute("bits") match {
@@ -100,7 +104,7 @@ class Collection(val path: String) {
   Collection.LOG.info(s"Successfully loaded collection $path")
 
   // Index management
-  def index(path: Seq[String], bits: Int, perBucket: Int) {
+  def index(path: List[String], bits: Int, perBucket: Int) {
     if (hashes.contains(path))
       throw new Exception(s"Collection ${this.path} already has $path indexed")
 
@@ -113,7 +117,7 @@ class Collection(val path: String) {
     saveConfig()
   }
 
-  def unindex(path: Seq[String]) {
+  def unindex(path: List[String]) {
     if (!hashes.contains(path))
       throw new Exception(s"Collection ${this.path} does not have $path indexed")
 
@@ -130,9 +134,13 @@ class Collection(val path: String) {
   // Document management
 
   def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
-    nodes(0).descendant
     if (path.size == 0) {
-      return (nodes map { node => node.toString }).toList
+      return (nodes map { node =>
+        if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
+          node.toString // Indexed XML element
+        else
+          node.child.mkString("") // Indexed XML non-element
+      }).toList
     } else {
       val ret = new ListBuffer[String]
       path match {
@@ -164,9 +172,19 @@ class Collection(val path: String) {
       val p1 = collection.offer(colInsert)
       Await.result(p1.future, Int.MaxValue nanosecond)
 
+      // Insert log entry
+      val p2 = log.offer(LogInsert(<i><data>{ doc }</data><id>{ colInsert.pos.data }</id></i>.toString.getBytes, new Output[Int](0)))
+
+      // Insert into indexes
+      val indexPromises = for (index <- hashes) yield index._2._2.offer(HashPut(getIn(doc, index._1).hashCode, colInsert.pos.data))
+
+      // No wait? Return right now
       if (!wait)
         return -1
 
+      // Wait for log insert and index put
+      Await.result(p2.future, Int.MaxValue nanosecond)
+      indexPromises foreach { p => Await.result(p.future, Int.MaxValue nanosecond) }
       return colInsert.pos.data
     } finally {
       write.unlock()

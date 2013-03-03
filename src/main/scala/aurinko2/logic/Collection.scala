@@ -3,15 +3,19 @@ package aurinko2.logic
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Paths
-import java.util.logging.Logger
 import java.util.concurrent.locks.ReentrantLock
+import java.util.logging.Logger
+
 import scala.collection.mutable.HashMap
+import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
 import scala.concurrent.Promise
 import scala.concurrent.duration.DurationLong
 import scala.xml.Elem
+import scala.xml.NodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
+
 import aurinko2.io.SimpleIO.spit
 import aurinko2.storage.{ Collection => CollFile }
 import aurinko2.storage.CollectionDelete
@@ -19,15 +23,13 @@ import aurinko2.storage.CollectionInsert
 import aurinko2.storage.CollectionRead
 import aurinko2.storage.CollectionUpdate
 import aurinko2.storage.Hash
+import aurinko2.storage.HashPut
+import aurinko2.storage.HashPut
 import aurinko2.storage.HashWork
-import aurinko2.storage.HashPut
 import aurinko2.storage.Log
+import aurinko2.storage.LogInsert
+import aurinko2.storage.LogInsert
 import aurinko2.storage.Output
-import aurinko2.storage.LogInsert
-import aurinko2.storage.HashPut
-import scala.xml.NodeSeq
-import scala.collection.mutable.ListBuffer
-import aurinko2.storage.LogInsert
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -152,7 +154,7 @@ class Collection(val path: String) {
     }
   }
 
-  /** Read a document given document ID, return the read document, or <code>null</code> if the document is no longer valid. */
+  /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
   def read(id: Int): Elem = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
     Await.result(collection.offer(work).future, Int.MaxValue nanosecond)
@@ -161,54 +163,51 @@ class Collection(val path: String) {
     return loadString(new String(work.data.data))
   }
 
-  /** Insert a document, return its ID or -1 if non-blocking. */
-  def insert(doc: Elem, wait: Boolean = false): Int = {
+  /** Insert a document, return its ID. */
+  def insert(doc: Elem): Int = {
     val docBytes = doc.toString.getBytes
     val colInsert = CollectionInsert(docBytes, new Output[Int](0))
+    val logInsert = LogInsert(<i>{ doc }</i>.toString.getBytes, new Output[Int](0))
+    val hashCodes = for (index <- hashes) yield (index, getIn(doc, index._1).hashCode)
     write.lock()
     try {
 
-      // Insert document first
-      val p1 = collection.offer(colInsert)
-      Await.result(p1.future, Int.MaxValue nanosecond)
+      if (hashes.size != hashCodes.size)
+        return insert(doc)
 
-      // Insert log entry
-      val p2 = log.offer(LogInsert(<i><data>{ doc }</data><id>{ colInsert.pos.data }</id></i>.toString.getBytes, new Output[Int](0)))
+      // Have to wait for collection insert to work out index values
+      Await.result(collection.offer(colInsert).future, Int.MaxValue nanosecond)
+      log.offer(logInsert)
+      hashCodes foreach { h => h._1._2._2.offer(HashPut(h._2, colInsert.pos.data)) }
 
-      // Insert into indexes
-      val indexPromises = for (index <- hashes) yield index._2._2.offer(HashPut(getIn(doc, index._1).hashCode, colInsert.pos.data))
-
-      // No wait? Return right now
-      if (!wait)
-        return -1
-
-      // Wait for log insert and index put
-      Await.result(p2.future, Int.MaxValue nanosecond)
-      indexPromises foreach { p => Await.result(p.future, Int.MaxValue nanosecond) }
       return colInsert.pos.data
+
     } finally {
       write.unlock()
     }
   }
 
-  /** Update a document given its ID and new document element, return updated document's ID or -1 if non-blocking. */
-  def update(id: Int, doc: Elem, wait: Boolean = false): Int = {
-    val work = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
+  /** Update a document given its ID and new document element, return updated document's ID. */
+  def update(id: Int, doc: Elem): Int = {
+    val docBytes = doc.toString.getBytes
+    val colUpdate = CollectionUpdate(id, docBytes, new Output[Int](0))
+    val logInsert = LogInsert(<u><id>{ id }</id><doc>{ doc }</doc></u>.toString.getBytes, new Output[Int](0))
+    val hashCodes = for (index <- hashes) yield (index, getIn(doc, index._1).hashCode)
     write.lock()
     try {
-      val p = collection.offer(work)
-      if (!wait)
-        return -1
+      if (hashes.size != hashCodes.size)
+        return update(id, doc)
 
-      Await.result(p.future, Int.MaxValue nanosecond)
-      return work.pos.data
+      Await.result(collection.offer(colUpdate).future, Int.MaxValue nanosecond)
+      log.offer(logInsert)
+
     } finally {
       write.unlock()
     }
   }
 
   /** Delete a document given its ID. */
-  def delete(id: Int, wait: Boolean = false) {
+  def delete(id: Int) {
     val work = CollectionDelete(id)
     write.lock()
     try {

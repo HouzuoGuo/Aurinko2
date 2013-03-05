@@ -12,21 +12,23 @@ import scala.concurrent.Promise
 import scala.concurrent.duration.DurationLong
 import scala.xml.Elem
 import scala.xml.NodeSeq
+import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
+import scala.math.min
 import aurinko2.io.SimpleIO.spit
 import aurinko2.storage.{ Collection => CollFile }
-import aurinko2.storage.CollectionDelete
 import aurinko2.storage.CollectionInsert
 import aurinko2.storage.CollectionRead
 import aurinko2.storage.CollectionUpdate
 import aurinko2.storage.Hash
 import aurinko2.storage.HashPut
+import aurinko2.storage.HashRemove
 import aurinko2.storage.HashWork
 import aurinko2.storage.Log
 import aurinko2.storage.LogInsert
 import aurinko2.storage.Output
-import aurinko2.storage.HashRemove
+import aurinko2.storage.CollectionDelete
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -104,16 +106,18 @@ class Collection(val path: String) {
 
   Collection.LOG.info(s"Successfully loaded collection $path")
 
-  // Index management
+  /** Create a new index. */
   def index(path: List[String], bits: Int, perBucket: Int) {
     if (hashes.contains(path))
       throw new Exception(s"Collection ${this.path} already has $path indexed")
 
-    val filename = path(path.size - 1).substring(100) + System.nanoTime().toString
+    val lastSegment = path(path.size - 1)
+    val filename = Paths.get(this.path, lastSegment.substring(0, min(100, lastSegment.length())) + System.nanoTime().toString).toString
     hashes += ((path, (filename, new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket))))
     saveConfig()
   }
 
+  /** Delete an index. */
   def unindex(path: List[String]) {
     if (!hashes.contains(path))
       throw new Exception(s"Collection ${this.path} does not have $path indexed")
@@ -128,8 +132,7 @@ class Collection(val path: String) {
     saveConfig()
   }
 
-  // Document management
-
+  /** "Get into" an XML document, given a path. */
   def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
     if (path.size == 0) {
       return (nodes map { node =>
@@ -150,14 +153,15 @@ class Collection(val path: String) {
   }
 
   /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
-  def read(id: Int): Elem = {
+  def read(id: Int): Option[Elem] = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
     Await.result(collection.offer(work).future, Int.MaxValue nanosecond)
     if (work.data.data == null)
-      return null
-    return loadString(new String(work.data.data))
+      return None
+    return Some(loadString(new String(work.data.data)))
   }
 
+  /** Put a document into all indexes. */
   def indexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes foreach { index =>
@@ -167,6 +171,7 @@ class Collection(val path: String) {
     return promises.toList
   }
 
+  /** Remove a document froma ll indexes. */
   def unindexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes map { index =>
@@ -179,7 +184,7 @@ class Collection(val path: String) {
   /** Insert a document, return its ID. */
   def insert(doc: Elem): Int = {
 
-    // Insert to collection
+    // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
     val colPromise = collection.offer(colInsert)
     Await.result(colPromise.future, Int.MaxValue nanosecond)
@@ -189,29 +194,63 @@ class Collection(val path: String) {
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
     // Wait for log and indexes
-    (logPromise +: indexPromises) foreach { promise =>
-      Await.result(promise.future, Int.MaxValue nanosecond)
-    }
+    logPromise +: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
 
     return colInsert.pos.data
   }
 
   /** Update a document given its ID and new document element, return updated document's ID. */
-  def update(id: Int, doc: Elem): Int = {
-    val oldDoc = read(id)
-    return 0
+  def update(id: Int, doc: Elem): Option[Int] = {
+    read(id) match {
+      case Some(oldDoc) =>
+
+        // Update document
+        val colUpdate = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
+        val colPromise = collection.offer(colUpdate)
+        Await.result(colPromise.future, Int.MaxValue nanosecond)
+
+        // Unindex old document and index new document
+        val unindexPromises = unindexDoc(oldDoc, id)
+        val indexPromises = indexDoc(doc, colUpdate.pos.data)
+
+        // Insert to log
+        val logPromise = log.offer(LogInsert(<u><id>{ id }</id><doc>{ doc }</doc></u>.toString.getBytes, new Output[Int](0)))
+
+        // Wait for log and indexes
+        logPromise +: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+
+        return Some(colUpdate.pos.data)
+      case None =>
+        return None
+    }
   }
 
   /** Delete a document given its ID. */
   def delete(id: Int) {
-    return 0
+    read(id) match {
+      case Some(oldDoc) =>
+
+        // Delete document
+        val colDelete = CollectionDelete(id)
+        val colPromise = collection.offer(colDelete)
+
+        // Unindex old document
+        val unindexPromises = unindexDoc(oldDoc, id)
+
+        // Insert to log
+        val logPromise = log.offer(LogInsert(<d>{ id }</d>.toString.getBytes, new Output[Int](0)))
+
+        // Wait for everything
+        List(colPromise, logPromise) foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+        unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+      case None =>
+    }
   }
 
-  // Configuration and other
-
+  /** Save collection configurations, currently there is only indexes configuration. */
   def saveConfig() {
 
-    // Copy existing config to .bak
+    // Backup existing config to .bak
     val source = scala.io.Source.fromFile(Paths.get(path, "config").toString)
     spit(Paths.get(path, "config.bak").toString, Seq(source.mkString), false)
     source.close()

@@ -36,6 +36,11 @@ abstract class AppendFile(
     }
   }
   buf.position(appendAt)
+
+  // Fix "off by one"
+  if (appendAt % 2 == 1)
+    appendAt -= 1
+
   val int1 = buf.getInt()
   val int2 = buf.getInt()
   if (int2 != 0)

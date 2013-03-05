@@ -1,38 +1,147 @@
 package aurinko2.test.logic
 
 import org.scalatest.FunSuite
-
 import aurinko2.logic.Collection
 import TemporaryFactory.collection
+import scala.collection.mutable.ListBuffer
+import scala.xml.Elem
+import scala.xml.XML.loadString
 
 class CollectionTest extends FunSuite {
-  test("Collection document CRUD without index") {
+  test("collection document CRUD without index") {
     val col = collection
 
     // Insert & read
-    val pos = Seq(col.insert(<root>1</root>, true),
-      col.insert(<root>2</root>, true),
-      col.insert(<root>3</root>, true))
-    assert(col.read(pos(0)) == <root>1</root>)
-    assert(col.read(pos(1)) == <root>2</root>)
-    assert(col.read(pos(2)) == <root>3</root>)
+    val pos = Seq(col.insert(<root>1</root>),
+      col.insert(<root>2</root>),
+      col.insert(<root>3</root>))
+    assert(col.read(pos(0)).get == <root>1</root>)
+    assert(col.read(pos(1)).get == <root>2</root>)
+    assert(col.read(pos(2)).get == <root>3</root>)
 
     // Update
-    assert(col.read(col.update(pos(0), <root>a</root>, true)) == <root>a</root>)
-    assert(col.read(col.update(pos(1), <root>b</root>, true)) == <root>b</root>)
+    assert(col.read(col.update(pos(0), <root>a</root>).get).get == <root>a</root>)
+    assert(col.read(col.update(pos(1), <root>b</root>).get).get == <root>b</root>)
 
     // Delete
-    col.delete(pos(2), true)
-    assert(col.read(pos(2)) == null)
+    col.delete(pos(2))
+    assert(col.read(pos(2)).isEmpty)
 
     // Update at invalid ID
     intercept[IllegalArgumentException] {
-      col.update(1000000000, <abc></abc>, true)
+      col.update(1000000000, <abc></abc>)
     }
 
     // Delete at invalid ID
     intercept[IllegalArgumentException] {
-      col.delete(1000000000, true)
+      col.delete(1000000000)
     }
   }
+
+  test("collection CRUD log entries") {
+    val col = collection
+
+    // CRUD
+    val insert = col.insert(<root>1</root>)
+    val update = col.update(insert, <root>abcde</root>).get
+    val delete = col.delete(update)
+
+    val allLogs = new ListBuffer[Elem]
+    col.log.foreach { entry => allLogs += loadString(new String(entry)) }
+
+    // Scala apparently does not realize that those Lists are the same, thus string comparison
+    assert(allLogs.toList.toString.equals(List(<i><root>1</root></i>,
+      <u><id>{ insert }</id><doc><root>abcde</root></doc></u>,
+      <d>{ update }</d>).toString))
+  }
+
+  test("collection index insert/update/delete") {
+    val col = collection
+    col.index(List("a"), 4, 4)
+    col.index(List("a", "b", "c"), 4, 4)
+    val docs = Seq(col.insert(<root><a>1</a><a>2</a></root>),
+      col.insert(<root><a>3</a><a>4</a></root>),
+      col.insert(<root><a><ha></ha></a></root>))
+    val aIndex = col.hashes(List("a"))
+    val anotherIndex = col.hashes(List("a", "b", "c"))
+
+    assert(aIndex != null && anotherIndex != null)
+
+    // Insert to index
+    (() => {
+      val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val element = aIndex._2.get(<a><ha></ha></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+      assert(v1 == List(docs(0)))
+      assert(v2 == List(docs(0)))
+      assert(v3 == List(docs(1)))
+      assert(v4 == List(docs(1)))
+      assert(element == List(docs(2)))
+    })()
+
+    // Update indexed document
+    val updated = Seq(col.update(docs(0), <root><a>5</a><a>6</a></root>))
+    (() => {
+      val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v5 = aIndex._2.get("5".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v6 = aIndex._2.get("6".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val element = aIndex._2.get(<a><ha></ha></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+
+      // Old indexed value disappears
+      assert(v1 == List())
+      assert(v2 == List())
+
+      // Existing ones not affected
+      assert(v3 == List(docs(1)))
+      assert(v4 == List(docs(1)))
+      assert(element == List(docs(2)))
+
+      // Updated document updates indexed values
+      assert(v5 == List(docs(0)))
+      assert(v6 == List(docs(0)))
+    })()
+
+    // Delete indexed document
+    col.delete(docs(1))
+    (() => {
+      val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v5 = aIndex._2.get("5".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v6 = aIndex._2.get("6".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val element = aIndex._2.get(<a><ha></ha></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+
+      // Existing ones not affected
+      assert(v1 == List())
+      assert(v2 == List())
+      assert(element == List(docs(2)))
+      assert(v5 == List(docs(0)))
+      assert(v6 == List(docs(0)))
+
+      // Deleted document deletes indexed values
+      assert(v3 == List())
+      assert(v4 == List())
+    })()
+  }
+
+  test("collect all documents") {
+
+  }
+
+  test("create and delete index in non-empty collection") {
+
+  }
+
+  test("flush and close collection") {
+    val col = collection
+    col.save()
+    col.close()
+  }
+
 }

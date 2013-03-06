@@ -275,15 +275,17 @@ class Collection(val path: String) {
   /** Do function to all documents. */
   def foreach(f: Elem => Unit) {
     val promise = collection.offer(CollectionIterate((bytes: Array[Byte]) => {
-      var doc: Elem = null
-      try {
-        doc = loadString(new String(bytes))
-      } catch {
-        case e: Exception =>
-          Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(bytes)}")
+      if (bytes != null) {
+        var doc: Elem = null
+        try {
+          doc = loadString(new String(bytes))
+        } catch {
+          case e: Exception =>
+            Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(bytes)}")
+        }
+        if (doc != null)
+          f(doc)
       }
-      if (doc != null)
-        f(doc)
     }))
     Await.result(promise.future, Int.MaxValue second)
   }

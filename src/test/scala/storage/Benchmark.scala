@@ -23,8 +23,8 @@ The resources may be accessed from tests by using the getResource methods of jav
 """.getBytes()
 
   test("hash table storage layer performance benchmark") {
-    val entries = new ArrayBuffer[Int]
     val iterations = 200000
+    val entries = new ArrayBuffer[Int](iterations)
     val hash = hashTable(12, 100)
 
     println("Put 200k entries")
@@ -40,8 +40,8 @@ The resources may be accessed from tests by using the getResource methods of jav
   }
 
   test("collection storage layer performance benchmark") {
-    val positions = new ArrayBuffer[Int]
     val iterations = 200000
+    val positions = new ArrayBuffer[Int](iterations)
     val col = collection
 
     println("Insert 200k documents")
@@ -55,8 +55,8 @@ The resources may be accessed from tests by using the getResource methods of jav
   }
 
   test("log storage layer performance benchmark") {
-    val positions = new ArrayBuffer[Int]
     val iterations = 200000
+    val positions = new ArrayBuffer[Int](iterations)
     val lo = log
 
     println("Insert 200k log entries")

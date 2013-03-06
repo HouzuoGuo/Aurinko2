@@ -99,21 +99,21 @@ class Log(
 
   override def workOn(work: LogWork, promise: Promise[LogWork]) {
     work match {
-      case LogInsert(log: Array[Byte], pos: Output[Int]) =>
+      case LogInsert(log, pos) =>
         try {
           pos.data = insert(log)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case LogRead(id: Int, data: Output[Array[Byte]]) =>
+      case LogRead(id, data) =>
         try {
           data.data = read(id)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case LogIterate(f: Function1[Array[Byte], Unit]) =>
+      case LogIterate(f) =>
         try {
           foreach(f)
           promise.success(work)

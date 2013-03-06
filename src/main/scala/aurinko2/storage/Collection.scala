@@ -11,6 +11,7 @@ case class CollectionInsert(doc: Array[Byte], pos: Output[Int]) extends Collecti
 case class CollectionUpdate(id: Int, doc: Array[Byte], pos: Output[Int]) extends CollectionWork
 case class CollectionDelete(id: Int) extends CollectionWork
 case class CollectionRead(id: Int, data: Output[Array[Byte]]) extends CollectionWork
+case class CollectionIterate(f: Array[Byte] => Unit) extends CollectionWork
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Hash].getName())
@@ -134,33 +135,50 @@ class Collection(
         throw new IllegalArgumentException(s"Document $id does not exist")
   }
 
+  /** Iterate through all documents. */
+  def foreach(f: Array[Byte] => Unit) {
+    buf.position(0)
+
+    // While the entry is not empty
+    while (buf.getLong() != 0) {
+      buf.position(buf.position() - Collection.DOC_HEADER_SIZE)
+      f(read(buf.position()))
+    }
+  }
+
   override def workOn(work: CollectionWork, promise: Promise[CollectionWork]) {
     work match {
-      case CollectionInsert(doc: Array[Byte], pos: Output[Int]) =>
+      case CollectionInsert(doc, pos) =>
         try {
           pos.data = insert(doc)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-
-      case CollectionUpdate(id: Int, doc: Array[Byte], pos: Output[Int]) =>
+      case CollectionUpdate(id, doc, pos) =>
         try {
           pos.data = update(id, doc)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case CollectionDelete(id: Int) =>
+      case CollectionDelete(id) =>
         try {
           delete(id)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case CollectionRead(id: Int, data: Output[Array[Byte]]) =>
+      case CollectionRead(id, data) =>
         try {
           data.data = read(id)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case CollectionIterate(f) =>
+        try {
+          foreach(f)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)

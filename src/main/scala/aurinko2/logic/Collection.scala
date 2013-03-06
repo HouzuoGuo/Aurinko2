@@ -29,6 +29,7 @@ import aurinko2.storage.Log
 import aurinko2.storage.LogInsert
 import aurinko2.storage.Output
 import aurinko2.storage.CollectionDelete
+import aurinko2.storage.CollectionIterate
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -75,7 +76,7 @@ class Collection(val path: String) {
   // Parse collection indexes
   val hashes = new HashMap[List[String], Tuple2[String, Hash]]
   if (config != null)
-    (config \ "hashes").foreach { hash =>
+    (config \ "hash").foreach { hash =>
       hash.attribute("file") match {
         case Some(filename) =>
           Collection.LOG.info(s"Loading hash index $filename")
@@ -158,7 +159,13 @@ class Collection(val path: String) {
     Await.result(collection.offer(work).future, Int.MaxValue nanosecond)
     if (work.data.data == null)
       return None
-    return Some(loadString(new String(work.data.data)))
+    try {
+      return Some(loadString(new String(work.data.data)))
+    } catch {
+      case e: Exception =>
+        Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(work.data.data)}")
+        return None
+    }
   }
 
   /** Put a document into all indexes. */
@@ -171,7 +178,7 @@ class Collection(val path: String) {
     return promises.toList
   }
 
-  /** Remove a document froma ll indexes. */
+  /** Remove a document from all indexes. */
   def unindexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes map { index =>
@@ -217,7 +224,7 @@ class Collection(val path: String) {
         val logPromise = log.offer(LogInsert(<u><id>{ id }</id><doc>{ doc }</doc></u>.toString.getBytes, new Output[Int](0)))
 
         // Wait for log and indexes
-        logPromise +: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+        logPromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
 
         return Some(colUpdate.pos.data)
       case None =>
@@ -241,10 +248,27 @@ class Collection(val path: String) {
         val logPromise = log.offer(LogInsert(<d>{ id }</d>.toString.getBytes, new Output[Int](0)))
 
         // Wait for everything
-        List(colPromise, logPromise) foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+        Await.result(colPromise.future, Int.MaxValue nanosecond)
+        Await.result(logPromise.future, Int.MaxValue nanosecond)
         unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
       case None =>
     }
+  }
+
+  /** Do function to all elements. */
+  def foreach(f: Elem => Unit) {
+    val promise = collection.offer(CollectionIterate((bytes: Array[Byte]) => {
+      var doc: Elem = null
+      try {
+        doc = loadString(new String(bytes))
+      } catch {
+        case e: Exception =>
+          Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(bytes)}")
+      }
+      if (doc != null)
+        f(doc)
+    }))
+    Await.result(promise.future, Int.MaxValue nanosecond)
   }
 
   /** Save collection configurations, currently there is only indexes configuration. */

@@ -149,22 +149,21 @@ class Hash(
 
   override def workOn(work: HashWork, promise: Promise[HashWork]) {
     work match {
-      case HashGet(key: Int, limit: Int, filter: Function2[Int, Int, Boolean],
-        result: Output[List[Tuple2[Int, Int]]]) =>
+      case HashGet(key, limit, filter, result) =>
         try {
           result.data = get(key, limit, filter)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case HashPut(key: Int, value: Int) =>
+      case HashPut(key, value) =>
         try {
           put(key, value)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case HashRemove(key: Int, limit: Int, filter: Function2[Int, Int, Boolean]) =>
+      case HashRemove(key, limit, filter) =>
         try {
           remove(key, limit, filter)
           promise.success(work)

@@ -1,11 +1,13 @@
 package aurinko2.test.logic
 
-import org.scalatest.FunSuite
-import aurinko2.logic.Collection
-import TemporaryFactory.collection
 import scala.collection.mutable.ListBuffer
 import scala.xml.Elem
 import scala.xml.XML.loadString
+
+import org.scalatest.FunSuite
+
+import TemporaryFactory.collection
+import aurinko2.logic.Collection
 
 class CollectionTest extends FunSuite {
   test("collection document CRUD without index") {
@@ -130,8 +132,31 @@ class CollectionTest extends FunSuite {
     })()
   }
 
-  test("collect all documents") {
+  test("save/load collection configuration") {
+    // Create collection with two indexes
+    val col = collection
+    col.index(List("a1", "b2", "c3"), 3, 4)
+    col.index(List("a1", "b2", "c3", "d4"), 5, 6)
+    col.close()
+    // Re-open it
+    val reopen = new Collection(col.path)
+    println(reopen.hashes.keySet)
+    println(Set(List("a1", "b2", "c3"), List("a1", "b2", "c3", "d4")))
+    assert(reopen.hashes.keySet.sameElements(Set(List("a1", "b2", "c3"), List("a1", "b2", "c3", "d4"))))
+    val indexParams = reopen.hashes.map(_._2._2).toSeq
+    assert(indexParams(0).hashBits == 3)
+    assert(indexParams(0).perBucket == 4)
+    assert(indexParams(1).hashBits == 5)
+    assert(indexParams(1).perBucket == 6)
+  }
 
+  test("collect all documents") {
+    val col = collection
+    val docs = List(<a>1</a>, <b>2</b>, <c>3</c>)
+    docs foreach { col.insert(_) }
+    val readback = new ListBuffer[Elem]
+    col foreach { readback += _ }
+    assert(readback.toList == docs)
   }
 
   test("create and delete index in non-empty collection") {

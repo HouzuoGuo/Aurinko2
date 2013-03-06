@@ -10,6 +10,7 @@ import TemporaryFactory.collection
 import aurinko2.logic.Collection
 
 class CollectionTest extends FunSuite {
+
   test("collection document CRUD without index") {
     val col = collection
 
@@ -63,7 +64,7 @@ class CollectionTest extends FunSuite {
     col.index(List("a", "b", "c"), 4, 4)
     val docs = Seq(col.insert(<root><a>1</a><a>2</a></root>),
       col.insert(<root><a>3</a><a>4</a></root>),
-      col.insert(<root><a><ha></ha></a></root>))
+      col.insert(<root><a><ha/></a></root>))
     val aIndex = col.hashes(List("a"))
     val anotherIndex = col.hashes(List("a", "b", "c"))
 
@@ -75,7 +76,7 @@ class CollectionTest extends FunSuite {
       val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
       val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
       val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val element = aIndex._2.get(<a><ha></ha></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+      val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
       assert(v1 == List(docs(0)))
       assert(v2 == List(docs(0)))
       assert(v3 == List(docs(1)))
@@ -92,7 +93,7 @@ class CollectionTest extends FunSuite {
       val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
       val v5 = aIndex._2.get("5".hashCode(), -1, (_, _2) => true).map { _._2 }
       val v6 = aIndex._2.get("6".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val element = aIndex._2.get(<a><ha></ha></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+      val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
 
       // Old indexed value disappears
       assert(v1 == List())
@@ -117,7 +118,7 @@ class CollectionTest extends FunSuite {
       val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
       val v5 = aIndex._2.get("5".hashCode(), -1, (_, _2) => true).map { _._2 }
       val v6 = aIndex._2.get("6".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val element = aIndex._2.get(<a><ha></ha></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+      val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
 
       // Existing ones not affected
       assert(v1 == List())
@@ -135,14 +136,12 @@ class CollectionTest extends FunSuite {
   test("save/load collection configuration") {
     // Create collection with two indexes
     val col = collection
-    col.index(List("a1", "b2", "c3"), 3, 4)
-    col.index(List("a1", "b2", "c3", "d4"), 5, 6)
+    col.index(List("a", "b"), 3, 4)
+    col.index(List("c", "d", "e"), 5, 6)
     col.close()
     // Re-open it
     val reopen = new Collection(col.path)
-    println(reopen.hashes.keySet)
-    println(Set(List("a1", "b2", "c3"), List("a1", "b2", "c3", "d4")))
-    assert(reopen.hashes.keySet.sameElements(Set(List("a1", "b2", "c3"), List("a1", "b2", "c3", "d4"))))
+    assert(reopen.hashes.keySet == Set(List("a", "b"), List("c", "d", "e")))
     val indexParams = reopen.hashes.map(_._2._2).toSeq
     assert(indexParams(0).hashBits == 3)
     assert(indexParams(0).perBucket == 4)
@@ -150,7 +149,7 @@ class CollectionTest extends FunSuite {
     assert(indexParams(1).perBucket == 6)
   }
 
-  test("collect all documents") {
+  test("iterate all documents") {
     val col = collection
     val docs = List(<a>1</a>, <b>2</b>, <c>3</c>)
     docs foreach { col.insert(_) }
@@ -159,14 +158,61 @@ class CollectionTest extends FunSuite {
     assert(readback.toList == docs)
   }
 
-  test("create and delete index in non-empty collection") {
+  test("iterate all document IDs") {
+    val col = collection
+    val docs = List(col.insert(<a>1</a>), col.insert(<b>2</b>), col.insert(<c>3</c>))
+    val readback = new ListBuffer[Int]
+    col foreachID { readback += _ }
+    assert(readback.toList == docs)
+  }
 
+  test("create and delete index in non-empty collection") {
+    val col = collection
+    val docs = Seq(col.insert(<root><a>1</a><a>2</a></root>),
+      col.insert(<root><a>3</a><a>4</a></root>),
+      col.insert(<root><a><ha/></a></root>))
+
+    col.index(List("a"), 4, 4)
+    col.index(List("a", "b", "c"), 4, 4)
+    val aIndex = col.hashes(List("a"))
+    val anotherIndex = col.hashes(List("a", "b", "c"))
+    assert(aIndex != null && anotherIndex != null)
+
+    val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
+    assert(v1 == List(docs(0)))
+    assert(v2 == List(docs(0)))
+    assert(v3 == List(docs(1)))
+    assert(v4 == List(docs(1)))
+    assert(element == List(docs(2)))
+
+    col.unindex(List("a"))
+    assert(col.hashes.size == 1)
+    intercept[NoSuchElementException] {
+      col.hashes(List("a"))
+    }
   }
 
   test("flush and close collection") {
     val col = collection
     col.save()
     col.close()
+  }
+
+  test("get into an XML document") {
+    val test = <root>
+                 <a>1</a>
+                 <a whatever="a">2</a>
+                 <b>
+                   <c>c</c>
+                 </b>
+               </root>
+    assert(Collection.getIn(test, List("a")) == List("1", "2"))
+    assert(Collection.getIn(test, List("b", "c")) == List("c"))
+    assert(Collection.getIn(test, List("z")) == List())
   }
 
 }

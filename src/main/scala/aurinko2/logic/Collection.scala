@@ -30,9 +30,31 @@ import aurinko2.storage.LogInsert
 import aurinko2.storage.Output
 import aurinko2.storage.CollectionDelete
 import aurinko2.storage.CollectionIterate
+import aurinko2.storage.CollectionIterateID
+import aurinko2.storage.HashBarrier
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
+
+  /** "Get into" an XML document, given a path. */
+  def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
+    if (path.size == 0) {
+      return (nodes map { node =>
+        if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
+          node.toString // Index XML element
+        else
+          node.child.mkString("") // Index XML non-element
+      }).toList
+    } else {
+      val ret = new ListBuffer[String]
+      path match {
+        case first :: rest =>
+          nodes foreach { node => ret ++= getIn(node \ first, rest) }
+        case Nil =>
+      }
+      return ret.toList
+    }
+  }
 }
 
 class Collection(val path: String) {
@@ -114,7 +136,22 @@ class Collection(val path: String) {
 
     val lastSegment = path(path.size - 1)
     val filename = Paths.get(this.path, lastSegment.substring(0, min(100, lastSegment.length())) + System.nanoTime().toString).toString
-    hashes += ((path, (filename, new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket))))
+    val newIndex = new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket)
+    hashes += ((path, (filename, newIndex)))
+
+    // Index all the documents
+    val ids = new ListBuffer[Int]
+    foreachID { ids += _ }
+    ids foreach { id =>
+      read(id) match {
+        case Some(doc) =>
+          for (toIndex <- Collection.getIn(doc, path))
+            newIndex.offer(HashPut(toIndex.hashCode(), id))
+        case None =>
+      }
+    }
+    Await.result(newIndex.offer(HashBarrier()).future, Int.MaxValue second)
+
     saveConfig()
   }
 
@@ -133,30 +170,10 @@ class Collection(val path: String) {
     saveConfig()
   }
 
-  /** "Get into" an XML document, given a path. */
-  def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
-    if (path.size == 0) {
-      return (nodes map { node =>
-        if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
-          node.toString // Index XML element
-        else
-          node.child.mkString("") // Index XML non-element
-      }).toList
-    } else {
-      val ret = new ListBuffer[String]
-      path match {
-        case first :: rest =>
-          nodes foreach { node => ret ++= getIn(node \ first, rest) }
-        case Nil =>
-      }
-      return ret.toList
-    }
-  }
-
   /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
   def read(id: Int): Option[Elem] = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
-    Await.result(collection.offer(work).future, Int.MaxValue nanosecond)
+    Await.result(collection.offer(work).future, Int.MaxValue second)
     if (work.data.data == null)
       return None
     try {
@@ -172,7 +189,7 @@ class Collection(val path: String) {
   def indexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes foreach { index =>
-      for (toIndex <- getIn(doc, index._1))
+      for (toIndex <- Collection.getIn(doc, index._1))
         promises += index._2._2.offer(HashPut(toIndex.hashCode(), id))
     }
     return promises.toList
@@ -182,7 +199,7 @@ class Collection(val path: String) {
   def unindexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes map { index =>
-      for (toIndex <- getIn(doc, index._1))
+      for (toIndex <- Collection.getIn(doc, index._1))
         promises += index._2._2.offer(HashRemove(toIndex.hashCode(), 1, (_, value) => value == id))
     }
     return promises.toList
@@ -194,14 +211,14 @@ class Collection(val path: String) {
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
     val colPromise = collection.offer(colInsert)
-    Await.result(colPromise.future, Int.MaxValue nanosecond)
+    Await.result(colPromise.future, Int.MaxValue second)
 
     // Insert to log and indexes
     val logPromise = log.offer(LogInsert(<i>{ doc }</i>.toString.getBytes, new Output[Int](0)))
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
     // Wait for log and indexes
-    logPromise +: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+    logPromise +: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
     return colInsert.pos.data
   }
@@ -214,7 +231,7 @@ class Collection(val path: String) {
         // Update document
         val colUpdate = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
         val colPromise = collection.offer(colUpdate)
-        Await.result(colPromise.future, Int.MaxValue nanosecond)
+        Await.result(colPromise.future, Int.MaxValue second)
 
         // Unindex old document and index new document
         val unindexPromises = unindexDoc(oldDoc, id)
@@ -224,7 +241,7 @@ class Collection(val path: String) {
         val logPromise = log.offer(LogInsert(<u><id>{ id }</id><doc>{ doc }</doc></u>.toString.getBytes, new Output[Int](0)))
 
         // Wait for log and indexes
-        logPromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+        logPromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
         return Some(colUpdate.pos.data)
       case None =>
@@ -248,14 +265,14 @@ class Collection(val path: String) {
         val logPromise = log.offer(LogInsert(<d>{ id }</d>.toString.getBytes, new Output[Int](0)))
 
         // Wait for everything
-        Await.result(colPromise.future, Int.MaxValue nanosecond)
-        Await.result(logPromise.future, Int.MaxValue nanosecond)
-        unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue nanosecond) }
+        Await.result(colPromise.future, Int.MaxValue second)
+        Await.result(logPromise.future, Int.MaxValue second)
+        unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
       case None =>
     }
   }
 
-  /** Do function to all elements. */
+  /** Do function to all documents. */
   def foreach(f: Elem => Unit) {
     val promise = collection.offer(CollectionIterate((bytes: Array[Byte]) => {
       var doc: Elem = null
@@ -268,7 +285,13 @@ class Collection(val path: String) {
       if (doc != null)
         f(doc)
     }))
-    Await.result(promise.future, Int.MaxValue nanosecond)
+    Await.result(promise.future, Int.MaxValue second)
+  }
+
+  /** Do function to all document IDs. */
+  def foreachID(f: Int => Unit) {
+    val promise = collection.offer(CollectionIterateID(f))
+    Await.result(promise.future, Int.MaxValue second)
   }
 
   /** Save collection configurations, currently there is only indexes configuration. */
@@ -287,9 +310,7 @@ class Collection(val path: String) {
             <hash file={ hash._2._1 } bits={ hash._2._2.hashBits.toString } per_bucket={ hash._2._2.perBucket.toString }>
               {
                 hash._1.map { segment =>
-                  <path>
-                    { segment }
-                  </path>
+                  <path>{ segment }</path>
                 }
               }
             </hash>

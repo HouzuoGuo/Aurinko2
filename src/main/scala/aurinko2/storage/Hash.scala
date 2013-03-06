@@ -14,6 +14,7 @@ case class HashGet(key: Int, limit: Int, filter: (Int, Int) => Boolean,
   result: Output[List[Tuple2[Int, Int]]]) extends HashWork
 case class HashPut(key: Int, value: Int) extends HashWork
 case class HashRemove(key: Int, limit: Int, filter: (Int, Int) => Boolean) extends HashWork
+case class HashBarrier extends HashWork
 
 object Hash {
   val LOG = Logger.getLogger(classOf[Hash].getName())
@@ -170,6 +171,8 @@ class Hash(
         } catch {
           case e: Exception => promise.failure(e)
         }
+      case HashBarrier() =>
+        promise.success(work)
     }
   }
 }

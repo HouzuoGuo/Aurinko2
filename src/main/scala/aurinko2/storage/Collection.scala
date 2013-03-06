@@ -11,7 +11,11 @@ case class CollectionInsert(doc: Array[Byte], pos: Output[Int]) extends Collecti
 case class CollectionUpdate(id: Int, doc: Array[Byte], pos: Output[Int]) extends CollectionWork
 case class CollectionDelete(id: Int) extends CollectionWork
 case class CollectionRead(id: Int, data: Output[Array[Byte]]) extends CollectionWork
+
+// Do not offer any other collection work (CRUD) when offering the work items below
+// Otherwise deadlock will be guaranteed
 case class CollectionIterate(f: Array[Byte] => Unit) extends CollectionWork
+case class CollectionIterateID(f: Int => Unit) extends CollectionWork
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Hash].getName())
@@ -146,6 +150,25 @@ class Collection(
     }
   }
 
+  /** Iterate through all document IDs. */
+  def foreachID(f: Int => Unit) {
+    buf.position(0)
+
+    // While the entry is not empty
+    while (buf.getLong() != 0) {
+      buf.position(buf.position() - Collection.DOC_HEADER_SIZE)
+
+      // Get document header
+      val pos = buf.position()
+      if (buf.getInt() == Collection.DOC_VALID)
+        f(pos)
+
+      // Skip document content
+      val skip = buf.getInt()
+      buf.position(buf.position() + skip)
+    }
+  }
+
   override def workOn(work: CollectionWork, promise: Promise[CollectionWork]) {
     work match {
       case CollectionInsert(doc, pos) =>
@@ -179,6 +202,13 @@ class Collection(
       case CollectionIterate(f) =>
         try {
           foreach(f)
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case CollectionIterateID(f) =>
+        try {
+          foreachID(f)
           promise.success(work)
         } catch {
           case e: Exception => promise.failure(e)

@@ -149,21 +149,12 @@ class CollectionTest extends FunSuite {
     assert(indexParams(1).perBucket == 6)
   }
 
-  test("iterate all documents") {
-    val col = collection
-    val docs = List(<a>1</a>, <b>2</b>, <c>3</c>)
-    docs foreach { col.insert(_) }
-    val readback = new ListBuffer[Elem]
-    col foreach { readback += _ }
-    assert(readback.toList == docs)
-  }
-
   test("iterate all document IDs") {
     val col = collection
-    val docs = List(col.insert(<a>1</a>), col.insert(<b>2</b>), col.insert(<c>3</c>))
-    val readback = new ListBuffer[Int]
-    col foreachID { readback += _ }
-    assert(readback.toList == docs)
+    val docs = Array(col.insert(<a>1</a>), col.insert(<b>2</b>), col.insert(<c>3</c>))
+    docs(2) = col.update(docs(2), <d>asdjfkljsadkfajsdlkjfaklsjfklajkjfskjksdfj</d>).get
+    col.delete(docs(1))
+    assert(col.all == List(docs(0), docs(2)))
   }
 
   test("create and delete index in non-empty collection") {

@@ -29,9 +29,9 @@ import aurinko2.storage.Log
 import aurinko2.storage.LogInsert
 import aurinko2.storage.Output
 import aurinko2.storage.CollectionDelete
-import aurinko2.storage.CollectionIterate
-import aurinko2.storage.CollectionIterateID
-import aurinko2.storage.HashBarrier
+import aurinko2.storage.HashSync
+import aurinko2.storage.CollectionSync
+import aurinko2.storage.HashGetAll
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -126,6 +126,7 @@ class Collection(val path: String) {
   // Open data files
   val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data").toString, "rw").getChannel())
   val log = new Log(new RandomAccessFile(Paths.get(path, "log").toString, "rw").getChannel())
+  val idIndex = new Hash(new RandomAccessFile(Paths.get(path, "id").toString, "rw").getChannel(), 14, 100)
 
   Collection.LOG.info(s"Successfully loaded collection $path")
 
@@ -140,9 +141,7 @@ class Collection(val path: String) {
     hashes += ((path, (filename, newIndex)))
 
     // Index all the documents
-    val ids = new ListBuffer[Int]
-    foreachID { ids += _ }
-    ids foreach { id =>
+    all foreach { id =>
       read(id) match {
         case Some(doc) =>
           for (toIndex <- Collection.getIn(doc, path))
@@ -150,7 +149,7 @@ class Collection(val path: String) {
         case None =>
       }
     }
-    Await.result(newIndex.offer(HashBarrier()).future, Int.MaxValue second)
+    Await.result(newIndex.offer(HashSync(() => {})).future, Int.MaxValue second)
 
     saveConfig()
   }
@@ -210,15 +209,15 @@ class Collection(val path: String) {
 
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
-    val colPromise = collection.offer(colInsert)
-    Await.result(colPromise.future, Int.MaxValue second)
+    Await.result(collection.offer(colInsert).future, Int.MaxValue second)
 
-    // Insert to log and indexes
+    // Insert to log , ID index and other indexes
     val logPromise = log.offer(LogInsert(<i>{ doc }</i>.toString.getBytes, new Output[Int](0)))
+    val idPromise = idIndex.offer(HashPut(colInsert.pos.data.hashCode, colInsert.pos.data))
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
     // Wait for log and indexes
-    logPromise +: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+    logPromise :: idPromise :: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
     return colInsert.pos.data
   }
@@ -230,18 +229,21 @@ class Collection(val path: String) {
 
         // Update document
         val colUpdate = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
-        val colPromise = collection.offer(colUpdate)
-        Await.result(colPromise.future, Int.MaxValue second)
+        Await.result(collection.offer(colUpdate).future, Int.MaxValue second)
 
         // Unindex old document and index new document
         val unindexPromises = unindexDoc(oldDoc, id)
         val indexPromises = indexDoc(doc, colUpdate.pos.data)
 
+        // Unindex old ID and index new ID
+        val idRemovePromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
+        val idPutPromise = idIndex.offer(HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data))
+
         // Insert to log
         val logPromise = log.offer(LogInsert(<u><id>{ id }</id><doc>{ doc }</doc></u>.toString.getBytes, new Output[Int](0)))
 
         // Wait for log and indexes
-        logPromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+        idPutPromise :: idRemovePromise :: logPromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
         return Some(colUpdate.pos.data)
       case None =>
@@ -255,45 +257,29 @@ class Collection(val path: String) {
       case Some(oldDoc) =>
 
         // Delete document
-        val colDelete = CollectionDelete(id)
-        val colPromise = collection.offer(colDelete)
+        val colPromise = collection.offer(CollectionDelete(id))
 
         // Unindex old document
         val unindexPromises = unindexDoc(oldDoc, id)
 
+        // Unindex ID
+        val idPromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
+
         // Insert to log
         val logPromise = log.offer(LogInsert(<d>{ id }</d>.toString.getBytes, new Output[Int](0)))
 
-        // Wait for everything
+        // Wait for collection, log and indexes
         Await.result(colPromise.future, Int.MaxValue second)
-        Await.result(logPromise.future, Int.MaxValue second)
-        unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+        logPromise :: idPromise :: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
       case None =>
     }
   }
 
-  /** Do function to all documents. */
-  def foreach(f: Elem => Unit) {
-    val promise = collection.offer(CollectionIterate((bytes: Array[Byte]) => {
-      if (bytes != null) {
-        var doc: Elem = null
-        try {
-          doc = loadString(new String(bytes))
-        } catch {
-          case e: Exception =>
-            Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(bytes)}")
-        }
-        if (doc != null)
-          f(doc)
-      }
-    }))
-    Await.result(promise.future, Int.MaxValue second)
-  }
-
-  /** Do function to all document IDs. */
-  def foreachID(f: Int => Unit) {
-    val promise = collection.offer(CollectionIterateID(f))
-    Await.result(promise.future, Int.MaxValue second)
+  /** Get all document IDs. */
+  def all = {
+    val work = HashGetAll(new Output[List[Tuple2[Int, Int]]](null))
+    Await.result(idIndex.offer(work).future, Int.MaxValue second)
+    work.result.data.map(_._2)
   }
 
   /** Save collection configurations, currently there is only indexes configuration. */

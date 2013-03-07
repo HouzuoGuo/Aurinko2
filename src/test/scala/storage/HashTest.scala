@@ -48,4 +48,11 @@ class HashTest extends FunSuite {
     assert(hash.get("E".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(5))
     assert(hash.get("F".hashCode(), -1, (_: Int, _2: Int) => { true }).map { _._2 } == List(6))
   }
+
+  test("get all entries") {
+    val hash = hashTable(2, 2)
+    val entries = Map("a" -> 1, "b" -> 2, "c" -> 3, "d" -> 4, "e" -> 5, "f" -> 6, "g" -> 7)
+    entries foreach { entry => hash.put(entry._1.hashCode(), entry._2.hashCode) }
+    assert(hash.allEntries.toMap == entries.map { entry => entry._1.hashCode -> entry._2 })
+  }
 }

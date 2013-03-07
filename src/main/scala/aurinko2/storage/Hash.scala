@@ -14,7 +14,8 @@ case class HashGet(key: Int, limit: Int, filter: (Int, Int) => Boolean,
   result: Output[List[Tuple2[Int, Int]]]) extends HashWork
 case class HashPut(key: Int, value: Int) extends HashWork
 case class HashRemove(key: Int, limit: Int, filter: (Int, Int) => Boolean) extends HashWork
-case class HashBarrier extends HashWork
+case class HashSync(fun: () => Unit) extends HashWork
+case class HashGetAll(result: Output[List[Tuple2[Int, Int]]]) extends HashWork
 
 object Hash {
   val LOG = Logger.getLogger(classOf[Hash].getName())
@@ -114,6 +115,30 @@ class Hash(
     return result.toList
   }
 
+  /** Return all valid entries. */
+  def allEntries = {
+    val result = new ListBuffer[Tuple2[Int, Int]]()
+    for (bucket <- 0 until numberOfBuckets)
+      try {
+        for (entry <- 0 until perBucket) {
+          buf.position(bucket * bucketSize + Hash.BUCKET_HEADER_SIZE + entry * Hash.ENTRY_SIZE)
+          val entryPos = buf.position()
+          val validity = buf.getInt()
+          val entryKey = buf.getInt()
+          val value = buf.getInt()
+
+          if (validity == 0 && entryKey == 0 && value == 0)
+            throw new Exception("Break") // Scala never takes a break
+
+          if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
+            Hash.LOG.severe(s"Hash corruption - invalid entry header $entryPos")
+          else if (validity == Hash.ENTRY_VALID)
+            result += Tuple2(entryKey, value)
+        }
+      } catch { case e: Exception => }
+    result.toList
+  }
+
   /** Insert the key-value pair into hash table. */
   def put(key: Int, value: Int) {
     val startBucket = hashKey(key)
@@ -171,8 +196,20 @@ class Hash(
         } catch {
           case e: Exception => promise.failure(e)
         }
-      case HashBarrier() =>
-        promise.success(work)
+      case HashSync(fun) =>
+        try {
+          fun()
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
+      case HashGetAll(result) =>
+        try {
+          result.data = allEntries
+          promise.success(work)
+        } catch {
+          case e: Exception => promise.failure(e)
+        }
     }
   }
 }

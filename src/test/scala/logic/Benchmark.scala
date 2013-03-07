@@ -1,6 +1,7 @@
 package aurinko2.test.logic
 
 import scala.collection.mutable.ArrayBuffer
+import scala.math.max
 import scala.util.Random
 import scala.xml.Elem
 
@@ -14,9 +15,12 @@ class Benchmark extends FunSuite {
 
   val random = new Random()
 
+  /*
+   * This benchmark spawns multiple threads to simulate concurrent read and write operations.
+   */
   test("collection storage layer performance benchmark") {
-    val numThreads = 8
-    val iterations = 200000
+    val numThreads = max(Runtime.getRuntime().availableProcessors() * 2, 4)
+    val iterations = 20000
     val positions = new ArrayBuffer[Int](iterations)
     val col = collection
     col.index(List("a", "b", "c"), 14, 200)
@@ -25,8 +29,8 @@ class Benchmark extends FunSuite {
     println("Insert 200k documents with 2 indexes")
     val inserts = for (i <- 1 to numThreads) yield new Thread {
       override def run() {
-        for (j <- 1 to iterations / numThreads)
-          positions += col.insert(
+        for (j <- 1 to iterations / numThreads) {
+          val position = col.insert(
             <root>
               <a><b><c>{ random.nextInt(20000) }</c></b></a>
               <d><e><f>{ random.nextInt(20000) }</f><f>{ random.nextInt(20000) }</f></e></d>
@@ -39,6 +43,8 @@ Resources for the test classpath in src/test/resources/
 The resources may be accessed from tests by using the getResource methods of java.lang.Class or java.lang.ClassLoader.
               </pudding>
             </root>)
+          positions.synchronized { positions += position }
+        }
       }
     }
     average(iterations) {
@@ -93,11 +99,11 @@ The resources may be accessed from tests by using the getResource methods of jav
       deletes foreach { _.join() }
     }
 
-    println("Iterate 200k documents")
-    time(1) { col.foreach((_: Elem) => {}) }
-
     println("Iterate 200k document IDs")
     time(1) { col.foreachID((_: Int) => {}) }
+
+    println("Iterate 200k documents")
+    time(1) { col.foreach((_: Elem) => {}) }
 
     println("Index 200k documents")
     col.unindex(List("a", "b", "c"))

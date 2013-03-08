@@ -5,7 +5,6 @@ import java.io.RandomAccessFile
 
 import aurinko2.storage.Collection
 import aurinko2.storage.Hash
-import aurinko2.storage.Log
 
 object TemporaryFactory {
 
@@ -23,10 +22,4 @@ object TemporaryFactory {
     new Hash((new RandomAccessFile(tmp, "rw")).getChannel(), bits, perBucket)
   }
 
-  /** Return a log structure which will be deleted upon JVM termination. */
-  def log: Log = {
-    val tmp = File.createTempFile("Aurinko2", System.nanoTime().toString)
-    tmp.deleteOnExit()
-    return new Log(new RandomAccessFile(tmp, "rw").getChannel())
-  }
 }

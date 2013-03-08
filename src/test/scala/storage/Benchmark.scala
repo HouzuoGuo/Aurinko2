@@ -7,7 +7,6 @@ import org.scalatest.FunSuite
 
 import TemporaryFactory.collection
 import TemporaryFactory.hashTable
-import TemporaryFactory.log
 import aurinko2.test.TimedExecution.time
 
 class Benchmark extends FunSuite {
@@ -54,14 +53,4 @@ The resources may be accessed from tests by using the getResource methods of jav
     time(iterations) { col.delete(positions(random.nextInt(iterations))) }
   }
 
-  test("log storage layer performance benchmark") {
-    val iterations = 200000
-    val positions = new ArrayBuffer[Int](iterations)
-    val lo = log
-
-    println("Insert 200k log entries")
-    time(iterations) { positions += lo.insert(docBytes) }
-    println("Read 200k log entries")
-    time(iterations) { lo.read(positions(random.nextInt(iterations))) }
-  }
 }

@@ -41,23 +41,6 @@ class CollectionTest extends FunSuite {
     }
   }
 
-  test("collection CRUD log entries") {
-    val col = collection
-
-    // CRUD
-    val insert = col.insert(<root>1</root>)
-    val update = col.update(insert, <root>abcde</root>).get
-    val delete = col.delete(update)
-
-    val allLogs = new ListBuffer[Elem]
-    col.log.foreach { entry => allLogs += loadString(new String(entry)) }
-
-    // Scala apparently does not realize that those Lists are the same, thus string comparison
-    assert(allLogs.toList.toString.equals(List(<i><root>1</root></i>,
-      <u><id>{ insert }</id><doc><root>abcde</root></doc></u>,
-      <d>{ update }</d>).toString))
-  }
-
   test("collection index insert/update/delete") {
     val col = collection
     col.index(List("a"), 4, 4)

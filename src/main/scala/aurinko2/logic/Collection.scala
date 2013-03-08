@@ -25,8 +25,6 @@ import aurinko2.storage.Hash
 import aurinko2.storage.HashPut
 import aurinko2.storage.HashRemove
 import aurinko2.storage.HashWork
-import aurinko2.storage.Log
-import aurinko2.storage.LogInsert
 import aurinko2.storage.Output
 import aurinko2.storage.CollectionDelete
 import aurinko2.storage.HashSync
@@ -125,7 +123,6 @@ class Collection(val path: String) {
 
   // Open data files
   val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data").toString, "rw").getChannel())
-  val log = new Log(new RandomAccessFile(Paths.get(path, "log").toString, "rw").getChannel())
   val idIndex = new Hash(new RandomAccessFile(Paths.get(path, "id").toString, "rw").getChannel(), 14, 100)
 
   Collection.LOG.info(s"Successfully loaded collection $path")
@@ -212,12 +209,11 @@ class Collection(val path: String) {
     Await.result(collection.offer(colInsert).future, Int.MaxValue second)
 
     // Insert to log , ID index and other indexes
-    val logPromise = log.offer(LogInsert(<i>{ doc }</i>.toString.getBytes, new Output[Int](0)))
     val idPromise = idIndex.offer(HashPut(colInsert.pos.data.hashCode, colInsert.pos.data))
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
     // Wait for log and indexes
-    logPromise :: idPromise :: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+    idPromise :: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
     return colInsert.pos.data
   }
@@ -239,11 +235,8 @@ class Collection(val path: String) {
         val idRemovePromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
         val idPutPromise = idIndex.offer(HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data))
 
-        // Insert to log
-        val logPromise = log.offer(LogInsert(<u><id>{ id }</id><doc>{ doc }</doc></u>.toString.getBytes, new Output[Int](0)))
-
-        // Wait for log and indexes
-        idPutPromise :: idRemovePromise :: logPromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+        // Wait for indexes
+        idPutPromise :: idRemovePromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
         return Some(colUpdate.pos.data)
       case None =>
@@ -265,12 +258,9 @@ class Collection(val path: String) {
         // Unindex ID
         val idPromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
 
-        // Insert to log
-        val logPromise = log.offer(LogInsert(<d>{ id }</d>.toString.getBytes, new Output[Int](0)))
-
-        // Wait for collection, log and indexes
+        // Wait for collection and indexes
         Await.result(colPromise.future, Int.MaxValue second)
-        logPromise :: idPromise :: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+        idPromise :: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
       case None =>
     }
   }
@@ -309,7 +299,6 @@ class Collection(val path: String) {
 
   /** Flush all collection changes to disk. */
   def save() {
-    log.force()
     collection.force()
     hashes foreach { _._2._2.force() }
     Collection.LOG.info(s"Collection $path saved at ${System.currentTimeMillis()}")
@@ -317,7 +306,6 @@ class Collection(val path: String) {
 
   /** Save and close the collection. */
   def close() {
-    log.close()
     collection.close()
     hashes foreach { _._2._2.force() }
     Collection.LOG.info(s"Collection $path closed at ${System.currentTimeMillis()}")

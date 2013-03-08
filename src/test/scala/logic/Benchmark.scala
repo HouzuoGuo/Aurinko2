@@ -19,7 +19,7 @@ class Benchmark extends FunSuite {
    * This benchmark spawns multiple threads to simulate concurrent read and write operations.
    */
   test("collection storage layer performance benchmark") {
-    val numThreads = max(Runtime.getRuntime().availableProcessors(), 4)
+    val numThreads = max(Runtime.getRuntime().availableProcessors() * 2, 4)
     val iterations = 200000
     val positions = new ArrayBuffer[Int](iterations)
     val col = collection

@@ -223,16 +223,15 @@ class Collection(val path: String) {
     read(id) match {
       case Some(oldDoc) =>
 
-        // Update document
+        // Update document, remove old indexed value
         val colUpdate = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
-        Await.result(collection.offer(colUpdate).future, Int.MaxValue second)
-
-        // Unindex old document and index new document
+        val updatePromise = collection.offer(colUpdate)
         val unindexPromises = unindexDoc(oldDoc, id)
-        val indexPromises = indexDoc(doc, colUpdate.pos.data)
-
-        // Unindex old ID and index new ID
         val idRemovePromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
+
+        // Wait for document update
+        Await.result(updatePromise.future, Int.MaxValue second)
+        val indexPromises = indexDoc(doc, colUpdate.pos.data)
         val idPutPromise = idIndex.offer(HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data))
 
         // Wait for indexes

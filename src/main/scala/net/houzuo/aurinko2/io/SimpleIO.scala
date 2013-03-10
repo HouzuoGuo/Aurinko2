@@ -1,4 +1,4 @@
-package aurinko2.io
+package net.houzuo.aurinko2.io
 
 import java.io.BufferedWriter
 import java.io.File

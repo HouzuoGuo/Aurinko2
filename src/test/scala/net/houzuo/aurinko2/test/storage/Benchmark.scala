@@ -1,4 +1,4 @@
-package aurinko2.test.storage
+package net.houzuo.aurinko2.test.storage
 
 import scala.collection.mutable.ArrayBuffer
 import scala.util.Random
@@ -7,7 +7,7 @@ import org.scalatest.FunSuite
 
 import TemporaryFactory.collection
 import TemporaryFactory.hashTable
-import aurinko2.test.TimedExecution.time
+import net.houzuo.aurinko2.test.TimedExecution.time
 
 class Benchmark extends FunSuite {
 

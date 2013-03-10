@@ -1,4 +1,4 @@
-package aurinko2.storage
+package net.houzuo.aurinko2.storage
 
 import java.nio.channels.FileChannel
 import java.nio.channels.FileChannel.MapMode
@@ -41,6 +41,7 @@ abstract class AppendFile(
   if (appendAt % 2 == 1)
     appendAt -= 1
 
+  // Fix "off by one or two"
   val int1 = buf.getInt()
   val int2 = buf.getInt()
   if (int2 != 0)

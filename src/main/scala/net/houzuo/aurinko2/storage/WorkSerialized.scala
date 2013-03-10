@@ -1,13 +1,14 @@
-package aurinko2.storage
+package net.houzuo.aurinko2.storage
 
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+
 import scala.concurrent.Promise
 import scala.concurrent.promise
-import java.util.logging.Logger
 
 /** A class with a mutable value. */
 case class Output[T](var data: T)
+
 /**
  * Serialized work loads.
  */
@@ -34,6 +35,5 @@ trait WorkSerialized[I] {
     }
   }.start()
 
-  /** Class with this trait must implement this method. */
   def workOn(work: I, result: Promise[I])
 }

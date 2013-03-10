@@ -1,15 +1,14 @@
-package aurinko2.test.logic
+package net.houzuo.aurinko2.test.logic
 
 import scala.collection.mutable.ArrayBuffer
 import scala.math.max
 import scala.util.Random
-import scala.xml.Elem
 
 import org.scalatest.FunSuite
 
 import TemporaryFactory.collection
-import aurinko2.test.TimedExecution.average
-import aurinko2.test.TimedExecution.time
+import net.houzuo.aurinko2.test.TimedExecution.average
+import net.houzuo.aurinko2.test.TimedExecution.time
 
 class Benchmark extends FunSuite {
 

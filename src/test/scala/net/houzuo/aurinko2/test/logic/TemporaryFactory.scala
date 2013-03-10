@@ -1,12 +1,12 @@
-package aurinko2.test.logic
+package net.houzuo.aurinko2.test.logic
 
 import java.io.File
 import java.nio.file.Files
 
 import scala.collection.mutable.ListBuffer
 
-import aurinko2.io.SimpleIO.rmrf
-import aurinko2.logic.Collection
+import net.houzuo.aurinko2.io.SimpleIO.rmrf
+import net.houzuo.aurinko2.logic.Collection
 
 object TemporaryFactory {
   val tempDirs = new ListBuffer[File]

@@ -1,35 +1,36 @@
-package aurinko2.logic
+package net.houzuo.aurinko2.logic
 
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Paths
 import java.util.concurrent.locks.ReentrantLock
 import java.util.logging.Logger
+
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
 import scala.concurrent.Promise
 import scala.concurrent.duration.DurationLong
+import scala.math.min
 import scala.xml.Elem
 import scala.xml.NodeSeq
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
-import scala.math.min
-import aurinko2.io.SimpleIO.spit
-import aurinko2.storage.{ Collection => CollFile }
-import aurinko2.storage.CollectionInsert
-import aurinko2.storage.CollectionRead
-import aurinko2.storage.CollectionUpdate
-import aurinko2.storage.Hash
-import aurinko2.storage.HashPut
-import aurinko2.storage.HashRemove
-import aurinko2.storage.HashWork
-import aurinko2.storage.Output
-import aurinko2.storage.CollectionDelete
-import aurinko2.storage.HashSync
-import aurinko2.storage.CollectionSync
-import aurinko2.storage.HashGetAll
+
+import net.houzuo.aurinko2.io.SimpleIO.spit
+import net.houzuo.aurinko2.storage.{ Collection => CollFile }
+import net.houzuo.aurinko2.storage.CollectionDelete
+import net.houzuo.aurinko2.storage.CollectionInsert
+import net.houzuo.aurinko2.storage.CollectionRead
+import net.houzuo.aurinko2.storage.CollectionUpdate
+import net.houzuo.aurinko2.storage.Hash
+import net.houzuo.aurinko2.storage.HashGetAll
+import net.houzuo.aurinko2.storage.HashPut
+import net.houzuo.aurinko2.storage.HashRemove
+import net.houzuo.aurinko2.storage.HashSync
+import net.houzuo.aurinko2.storage.HashWork
+import net.houzuo.aurinko2.storage.Output
 
 object Collection {
   val LOG = Logger.getLogger(classOf[Collection].getName())
@@ -37,7 +38,7 @@ object Collection {
   /** "Get into" an XML document, given a path. */
   def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
     if (path.size == 0) {
-      return (nodes map { node =>
+      (nodes map { node =>
         if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
           node.toString // Index XML element
         else
@@ -46,18 +47,17 @@ object Collection {
     } else {
       val ret = new ListBuffer[String]
       path match {
-        case first :: rest =>
-          nodes foreach { node => ret ++= getIn(node \ first, rest) }
-        case Nil =>
+        case first :: rest => nodes foreach { node => ret ++= getIn(node \ first, rest) }
+        case Nil           =>
       }
-      return ret.toList
+      ret.toList
     }
   }
 }
 
 class Collection(val path: String) {
 
-  private val write = new ReentrantLock()
+  private val write = new ReentrantLock
   private val configFilename = Paths.get(path, "config").toString
 
   Collection.LOG.info(s"Opening collection $path")
@@ -66,9 +66,8 @@ class Collection(val path: String) {
   private val testOpen = new File(path)
 
   if (!(testOpen.exists() && testOpen.isDirectory() &&
-    testOpen.canRead() && testOpen.canWrite() && testOpen.canExecute())) {
+    testOpen.canRead() && testOpen.canWrite() && testOpen.canExecute()))
     throw new Exception(s"Collection directory $path does not exist or is not RWX to you")
-  }
 
   // Load configuration file
   val configFile = new File(configFilename)
@@ -90,36 +89,30 @@ class Collection(val path: String) {
     config = XML.loadFile(configFile)
   } catch {
     case e: org.xml.sax.SAXParseException =>
-      throw new Exception(s"XML parser cannot parse $path/config, manually repair the collection?")
+      throw new Exception(s"XML parser cannot parse $path/config, manually repair the config file?")
   }
 
   // Parse collection indexes
   val hashes = new HashMap[List[String], Tuple2[String, Hash]]
-  if (config != null)
-    (config \ "hash").foreach { hash =>
-      hash.attribute("file") match {
-        case Some(filename) =>
-          Collection.LOG.info(s"Loading hash index $filename")
-          hashes.put(((hash \ "path").map { _.text }).toList,
-            (filename.text,
-              new Hash(new RandomAccessFile(filename.text, "rw").getChannel(),
-                hash.attribute("bits") match {
-                  case Some(bits) =>
-                    bits.text.toInt
-                  case None =>
-                    Collection.LOG.warning("No number of hash bits defined - using default 12")
-                    12
-                }, hash.attribute("per_bucket") match {
-                  case Some(entries) =>
-                    entries.text.toInt
-                  case None =>
-                    Collection.LOG.warning("No number of hash bits defined - using default 100")
-                    100
-                })))
-        case None =>
-          Collection.LOG.severe("An index exists in configuration file but without a file name. It is skipped.")
-      }
+  (config \ "hash").foreach { hash =>
+    hash.attribute("file") match {
+      case Some(filename) =>
+        Collection.LOG.info(s"Loading hash index $filename")
+        hashes.put(((hash \ "path").map { _.text }).toList,
+          (filename.text,
+            new Hash(new RandomAccessFile(filename.text, "rw").getChannel(),
+              hash.attribute("bits") match {
+                case Some(bits) => bits.text.toInt
+                case None       => throw new Exception(s"Index $filename has hash number of bits undefined")
+              },
+              hash.attribute("per_bucket") match {
+                case Some(entries) => entries.text.toInt
+                case None          => throw new Exception(s"Index $filename has index entries per bucket undefined")
+              })))
+      case None =>
+        Collection.LOG.severe("An index exists in configuration file but without a file name. It is skipped.")
     }
+  }
 
   // Open data files
   val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data").toString, "rw").getChannel())
@@ -157,10 +150,8 @@ class Collection(val path: String) {
       throw new Exception(s"Collection ${this.path} does not have $path indexed")
 
     val filename = hashes(path)._1
-    if (!new File(filename).delete()) {
-      Collection.LOG.severe(s"Cannot delete index file $filename")
+    if (!new File(filename).delete())
       throw new Exception(s"Cannot delete index file $filename")
-    }
 
     hashes -= path
     saveConfig()
@@ -182,27 +173,27 @@ class Collection(val path: String) {
   }
 
   /** Put a document into all indexes. */
-  def indexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
+  def indexDoc(doc: Elem, id: Int) = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes foreach { index =>
       for (toIndex <- Collection.getIn(doc, index._1))
         promises += index._2._2.offer(HashPut(toIndex.hashCode(), id))
     }
-    return promises.toList
+    promises.toList
   }
 
   /** Remove a document from all indexes. */
-  def unindexDoc(doc: Elem, id: Int): List[Promise[HashWork]] = {
+  def unindexDoc(doc: Elem, id: Int) = {
     val promises = new ListBuffer[Promise[HashWork]]
     hashes map { index =>
       for (toIndex <- Collection.getIn(doc, index._1))
         promises += index._2._2.offer(HashRemove(toIndex.hashCode(), 1, (_, value) => value == id))
     }
-    return promises.toList
+    promises.toList
   }
 
   /** Insert a document, return its ID. */
-  def insert(doc: Elem): Int = {
+  def insert(doc: Elem) = {
 
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
@@ -215,11 +206,11 @@ class Collection(val path: String) {
     // Wait for log and indexes
     idPromise :: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
-    return colInsert.pos.data
+    colInsert.pos.data
   }
 
   /** Update a document given its ID and new document element, return updated document's ID. */
-  def update(id: Int, doc: Elem): Option[Int] = {
+  def update(id: Int, doc: Elem) = {
     read(id) match {
       case Some(oldDoc) =>
 
@@ -237,9 +228,8 @@ class Collection(val path: String) {
         // Wait for indexes
         idPutPromise :: idRemovePromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
 
-        return Some(colUpdate.pos.data)
-      case None =>
-        return None
+        Some(colUpdate.pos.data)
+      case None => None
     }
   }
 

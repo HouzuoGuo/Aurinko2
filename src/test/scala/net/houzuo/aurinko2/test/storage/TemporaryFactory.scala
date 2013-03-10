@@ -1,10 +1,10 @@
-package aurinko2.test.storage
+package net.houzuo.aurinko2.test.storage
 
 import java.io.File
 import java.io.RandomAccessFile
 
-import aurinko2.storage.Collection
-import aurinko2.storage.Hash
+import net.houzuo.aurinko2.storage.Collection
+import net.houzuo.aurinko2.storage.Hash
 
 object TemporaryFactory {
 

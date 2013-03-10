@@ -1,4 +1,4 @@
-package aurinko2.storage
+package net.houzuo.aurinko2.storage
 
 import java.nio.channels.FileChannel
 import java.util.logging.Logger
@@ -66,7 +66,7 @@ class Collection(
   }
 
   /** Insert a document; return inserted document ID. */
-  def insert(doc: Array[Byte]): Int = {
+  def insert(doc: Array[Byte]) = {
     if (doc.length > Collection.MAX_DOC_SIZE)
       throw new IllegalArgumentException(s"Document is too large, it exceeds ${Collection.MAX_DOC_SIZE}")
 
@@ -82,7 +82,7 @@ class Collection(
     buf.put(doc)
     buf.put(" ".*(len * Collection.DOC_PADDING).getBytes())
     appendAt += Collection.DOC_HEADER_SIZE + room
-    return id
+    id
   }
 
   /** Update a document; return updated document ID. */
@@ -141,37 +141,27 @@ class Collection(
         try {
           pos.data = insert(doc)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case CollectionUpdate(id, doc, pos) =>
         try {
           pos.data = update(id, doc)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case CollectionDelete(id) =>
         try {
           delete(id)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case CollectionRead(id, data) =>
         try {
           data.data = read(id)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case CollectionSync(fun) =>
         try {
           fun()
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
     }
   }
 }

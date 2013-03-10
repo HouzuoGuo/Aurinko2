@@ -1,4 +1,4 @@
-package aurinko2.test.storage
+package net.houzuo.aurinko2.test.storage
 
 import org.scalatest.FunSuite
 

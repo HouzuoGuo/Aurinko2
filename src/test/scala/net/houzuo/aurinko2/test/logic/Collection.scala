@@ -1,13 +1,9 @@
-package aurinko2.test.logic
-
-import scala.collection.mutable.ListBuffer
-import scala.xml.Elem
-import scala.xml.XML.loadString
+package net.houzuo.aurinko2.test.logic
 
 import org.scalatest.FunSuite
 
-import TemporaryFactory.collection
-import aurinko2.logic.Collection
+import net.houzuo.aurinko2.logic.Collection
+import net.houzuo.aurinko2.test.logic.TemporaryFactory.collection
 
 class CollectionTest extends FunSuite {
 

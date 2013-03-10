@@ -1,4 +1,4 @@
-package aurinko2.storage
+package net.houzuo.aurinko2.storage
 
 import java.nio.channels.FileChannel
 import java.util.logging.Logger
@@ -11,7 +11,7 @@ import scala.math.pow
 // Workloads
 abstract class HashWork
 case class HashGet(key: Int, limit: Int, filter: (Int, Int) => Boolean,
-  result: Output[List[Tuple2[Int, Int]]]) extends HashWork
+                   result: Output[List[Tuple2[Int, Int]]]) extends HashWork
 case class HashPut(key: Int, value: Int) extends HashWork
 case class HashRemove(key: Int, limit: Int, filter: (Int, Int) => Boolean) extends HashWork
 case class HashSync(fun: () => Unit) extends HashWork
@@ -70,11 +70,11 @@ class Hash(
   }
 
   /** Return last chained bucket number. */
-  private def last(bucket: Int): Int = {
+  private def last(bucket: Int) = {
     var curr = bucket
     while (next(curr) != 0)
       curr = next(curr)
-    return curr
+    curr
   }
 
   /** Put a new bucket in the bucket chain. */
@@ -179,37 +179,27 @@ class Hash(
         try {
           result.data = get(key, limit, filter)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case HashPut(key, value) =>
         try {
           put(key, value)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case HashRemove(key, limit, filter) =>
         try {
           remove(key, limit, filter)
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case HashSync(fun) =>
         try {
           fun()
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
       case HashGetAll(result) =>
         try {
           result.data = allEntries
           promise.success(work)
-        } catch {
-          case e: Exception => promise.failure(e)
-        }
+        } catch { case e: Exception => promise.failure(e) }
     }
   }
 }

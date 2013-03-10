@@ -130,16 +130,38 @@ class Collection(val path: String) {
     val newIndex = new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket)
     hashes += ((path, (filename, newIndex)))
 
-    // Index all the documents
-    all foreach { id =>
-      read(id) match {
-        case Some(doc) =>
-          for (toIndex <- Collection.getIn(doc, path))
-            newIndex.offer(HashPut(toIndex.hashCode(), id))
-        case None =>
+    def indexDocs(ids: Seq[Int]) {
+      ids foreach { id =>
+        read(id) match {
+          case Some(doc) =>
+            for (toIndex <- Collection.getIn(doc, path))
+              newIndex.offer(HashPut(toIndex.hashCode(), id))
+          case None =>
+        }
       }
     }
-    Await.result(newIndex.offer(HashSync(() => {})).future, Int.MaxValue second)
+
+    val ids = all().toArray
+    if (ids.size > 0) {
+      val threads = Runtime.getRuntime().availableProcessors() * 2
+      val perThread = ids.size / threads
+
+      // When there are not enough documents, index them all using single thread
+      if (perThread < 1) {
+        indexDocs(ids)
+      } else {
+
+        // Using multiple threads to index all documents
+        val indexers = for (i <- Array.range(0, ids.size, perThread)) yield new Thread {
+          override def run() {
+            indexDocs(ids.slice(i, i + perThread))
+          }
+        }
+        indexers foreach { _.start() }
+        indexers foreach { _.join() }
+      }
+      Await.result(newIndex.offer(HashSync(() => {})).future, Int.MaxValue second)
+    }
 
     saveConfig()
   }
@@ -255,7 +277,7 @@ class Collection(val path: String) {
   }
 
   /** Get all document IDs. */
-  def all = {
+  def all() = {
     val work = HashGetAll(new Output[List[Tuple2[Int, Int]]](null))
     Await.result(idIndex.offer(work).future, Int.MaxValue second)
     work.result.data.map(_._2)

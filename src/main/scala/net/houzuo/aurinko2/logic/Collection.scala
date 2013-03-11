@@ -3,9 +3,11 @@ package net.houzuo.aurinko2.logic
 import java.io.File
 import java.io.RandomAccessFile
 import java.nio.file.Paths
-import java.util.concurrent.locks.ReentrantLock
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.logging.Logger
 
+import scala.Array.canBuildFrom
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
@@ -19,7 +21,7 @@ import scala.xml.XML
 import scala.xml.XML.loadString
 
 import net.houzuo.aurinko2.io.SimpleIO.spit
-import net.houzuo.aurinko2.storage.{ Collection => CollFile }
+import net.houzuo.aurinko2.storage.{Collection => CollFile}
 import net.houzuo.aurinko2.storage.CollectionDelete
 import net.houzuo.aurinko2.storage.CollectionInsert
 import net.houzuo.aurinko2.storage.CollectionRead
@@ -57,7 +59,6 @@ object Collection {
 
 class Collection(val path: String) {
 
-  private val write = new ReentrantLock
   private val configFilename = Paths.get(path, "config").toString
 
   Collection.LOG.info(s"Opening collection $path")
@@ -312,13 +313,13 @@ class Collection(val path: String) {
   def save() {
     collection.force()
     hashes foreach { _._2._2.force() }
-    Collection.LOG.info(s"Collection $path saved at ${System.currentTimeMillis()}")
+    Collection.LOG.info(s"Collection $path saved at ${new SimpleDateFormat("yyyy-MM-DD HH:mm:ss").format(new Date)}")
   }
 
   /** Save and close the collection. */
   def close() {
     collection.close()
     hashes foreach { _._2._2.force() }
-    Collection.LOG.info(s"Collection $path closed at ${System.currentTimeMillis()}")
+    Collection.LOG.info(s"Collection $path closed at ${new SimpleDateFormat("yyyy-MM-DD HH:mm:ss").format(new Date)}")
   }
 }

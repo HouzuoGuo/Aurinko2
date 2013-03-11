@@ -104,7 +104,7 @@ class Hash(
           return result.toList
 
         if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
-          Hash.LOG.severe(s"Hash corruption - invalid entry header $entryPos")
+          Hash.LOG.severe(s"Hash corruption - invalid entry header at $entryPos")
         else if (validity == Hash.ENTRY_VALID && entryKey == key && filter(entryKey, value)) {
           procFun(entryPos)
           result += Tuple2(entryKey, value)
@@ -131,7 +131,7 @@ class Hash(
             throw new Exception("Break") // Scala never takes a break
 
           if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
-            Hash.LOG.severe(s"Hash corruption - invalid entry header $entryPos")
+            Hash.LOG.severe(s"Hash corruption - invalid entry header at $entryPos")
           else if (validity == Hash.ENTRY_VALID)
             result += Tuple2(entryKey, value)
         }

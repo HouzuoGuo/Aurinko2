@@ -106,8 +106,7 @@ class Collection(
 
     // Not a document / document header corruption?
     if (room > Collection.MAX_DOC_ROOM) {
-      Collection.LOG.severe(s"Document $id has a header corruption - repair collection?")
-      return id
+      throw new Exception(s"Document $id has a header corruption - repair collection?")
     }
 
     if (room >= len) {

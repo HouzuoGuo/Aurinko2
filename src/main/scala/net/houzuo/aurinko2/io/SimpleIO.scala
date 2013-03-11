@@ -4,6 +4,7 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
 import java.io.IOException
+import scala.collection.mutable.ListBuffer
 
 object SimpleIO {
 
@@ -24,9 +25,12 @@ object SimpleIO {
 
   /** Remove a directory and everything underneath it.*/
   def rmrf(dir: File) {
-    if (dir.isFile())
-      dir.delete()
-    else {
+    val failures = new ListBuffer[String]
+
+    if (dir.isFile()) {
+      if (!dir.delete())
+        failures += dir.getAbsolutePath()
+    } else {
       for (file <- dir.listFiles())
         rmrf(file)
       dir.delete()

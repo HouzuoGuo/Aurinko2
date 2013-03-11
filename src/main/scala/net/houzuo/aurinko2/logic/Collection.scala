@@ -12,7 +12,7 @@ import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.Await
 import scala.concurrent.Promise
-import scala.concurrent.duration.DurationLong
+import scala.concurrent.duration.DurationInt
 import scala.math.min
 import scala.xml.Elem
 import scala.xml.NodeSeq
@@ -20,8 +20,9 @@ import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
 
+import net.houzuo.aurinko2.Main
 import net.houzuo.aurinko2.io.SimpleIO.spit
-import net.houzuo.aurinko2.storage.{Collection => CollFile}
+import net.houzuo.aurinko2.storage.{ Collection => CollFile }
 import net.houzuo.aurinko2.storage.CollectionDelete
 import net.houzuo.aurinko2.storage.CollectionInsert
 import net.houzuo.aurinko2.storage.CollectionRead
@@ -35,6 +36,8 @@ import net.houzuo.aurinko2.storage.HashWork
 import net.houzuo.aurinko2.storage.Output
 
 object Collection {
+
+  val TIMEOUT = 120000 // IO waiting timeout in milliseconds
   val LOG = Logger.getLogger(classOf[Collection].getName())
 
   /** "Get into" an XML document, given a path. */
@@ -131,6 +134,7 @@ class Collection(val path: String) {
     val newIndex = new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket)
     hashes += ((path, (filename, newIndex)))
 
+    // Index documents given their ID
     def indexDocs(ids: Seq[Int]) {
       ids foreach { id =>
         read(id) match {
@@ -144,8 +148,7 @@ class Collection(val path: String) {
 
     val ids = all().toArray
     if (ids.size > 0) {
-      val threads = Runtime.getRuntime().availableProcessors() * 2
-      val perThread = ids.size / threads
+      val perThread = ids.size / Main.parallelLevel
 
       // When there are not enough documents, index them all using single thread
       if (perThread < 1) {
@@ -161,7 +164,7 @@ class Collection(val path: String) {
         indexers foreach { _.start() }
         indexers foreach { _.join() }
       }
-      Await.result(newIndex.offer(HashSync(() => {})).future, Int.MaxValue second)
+      Await.result(newIndex.offer(HashSync(() => {})).future, Collection.TIMEOUT millisecond)
     }
 
     saveConfig()
@@ -183,7 +186,7 @@ class Collection(val path: String) {
   /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
   def read(id: Int): Option[Elem] = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
-    Await.result(collection.offer(work).future, Int.MaxValue second)
+    Await.result(collection.offer(work).future, Collection.TIMEOUT millisecond)
     if (work.data.data == null)
       return None
     try {
@@ -220,14 +223,14 @@ class Collection(val path: String) {
 
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
-    Await.result(collection.offer(colInsert).future, Int.MaxValue second)
+    Await.result(collection.offer(colInsert).future, Collection.TIMEOUT millisecond)
 
     // Insert to log , ID index and other indexes
     val idPromise = idIndex.offer(HashPut(colInsert.pos.data.hashCode, colInsert.pos.data))
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
     // Wait for log and indexes
-    idPromise :: indexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+    idPromise :: indexPromises foreach { promise => Await.result(promise.future, Collection.TIMEOUT millisecond) }
 
     colInsert.pos.data
   }
@@ -244,12 +247,12 @@ class Collection(val path: String) {
         val idRemovePromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
 
         // Wait for document update
-        Await.result(updatePromise.future, Int.MaxValue second)
+        Await.result(updatePromise.future, Collection.TIMEOUT millisecond)
         val indexPromises = indexDoc(doc, colUpdate.pos.data)
         val idPutPromise = idIndex.offer(HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data))
 
         // Wait for indexes
-        idPutPromise :: idRemovePromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+        idPutPromise :: idRemovePromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Collection.TIMEOUT millisecond) }
 
         Some(colUpdate.pos.data)
       case None => None
@@ -271,8 +274,8 @@ class Collection(val path: String) {
         val idPromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
 
         // Wait for collection and indexes
-        Await.result(colPromise.future, Int.MaxValue second)
-        idPromise :: unindexPromises foreach { promise => Await.result(promise.future, Int.MaxValue second) }
+        Await.result(colPromise.future, Collection.TIMEOUT millisecond)
+        idPromise :: unindexPromises foreach { promise => Await.result(promise.future, Collection.TIMEOUT millisecond) }
       case None =>
     }
   }
@@ -280,7 +283,7 @@ class Collection(val path: String) {
   /** Get all document IDs. */
   def all() = {
     val work = HashGetAll(new Output[List[Tuple2[Int, Int]]](null))
-    Await.result(idIndex.offer(work).future, Int.MaxValue second)
+    Await.result(idIndex.offer(work).future, Collection.TIMEOUT millisecond)
     work.result.data.map(_._2)
   }
 
@@ -308,6 +311,9 @@ class Collection(val path: String) {
       }</root>.toString),
       false)
   }
+
+  /** Return number of queued operations. */
+  def load = (hashes.map { hash => hash._1 -> hash._2._2.queueLength }).toMap ++ Map("idIndex" -> idIndex.queueLength, "data" -> collection.queueLength)
 
   /** Flush all collection changes to disk. */
   def save() {

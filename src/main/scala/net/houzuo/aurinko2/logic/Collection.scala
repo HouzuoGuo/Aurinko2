@@ -6,7 +6,6 @@ import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.logging.Logger
-
 import scala.Array.canBuildFrom
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
@@ -19,7 +18,6 @@ import scala.xml.NodeSeq
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
-
 import net.houzuo.aurinko2.Main
 import net.houzuo.aurinko2.io.SimpleIO.spit
 import net.houzuo.aurinko2.storage.{ Collection => CollFile }
@@ -34,11 +32,12 @@ import net.houzuo.aurinko2.storage.HashRemove
 import net.houzuo.aurinko2.storage.HashSync
 import net.houzuo.aurinko2.storage.HashWork
 import net.houzuo.aurinko2.storage.Output
+import java.io.IOException
 
 object Collection {
 
   val TIMEOUT = 120000 // IO waiting timeout in milliseconds
-  val LOG = Logger.getLogger(classOf[Collection].getName())
+  private val LOG = Logger.getLogger(classOf[Collection].getName())
 
   /** "Get into" an XML document, given a path. */
   def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
@@ -71,21 +70,21 @@ class Collection(val path: String) {
 
   if (!(testOpen.exists() && testOpen.isDirectory() &&
     testOpen.canRead() && testOpen.canWrite() && testOpen.canExecute()))
-    throw new Exception(s"Collection directory $path does not exist or is not RWX to you")
+    throw new IOException(s"$path directory does not exist or you do not have its RWX permissions")
 
   // Load configuration file
   val configFile = new File(configFilename)
 
   if (!configFile.exists())
     if (!configFile.createNewFile())
-      throw new Exception(s"Collection does not have config file and failed to create $path/config")
+      throw new IOException(s"Collection does not have config file and failed to create $path/config")
     else {
       spit(configFile.getAbsolutePath(), Seq("<root></root>"))
       Collection.LOG.info(s"Empty config file $path/config has been created")
     }
 
   if (!(configFile.canRead() && configFile.canWrite()))
-    throw new Exception(s"Config file $configFilename is not RW to you")
+    throw new IOException(s"Config file $configFilename is not RW to you")
 
   // Parse configuration file
   var config: Elem = null
@@ -151,7 +150,7 @@ class Collection(val path: String) {
       val perThread = ids.size / Main.parallelLevel
 
       // When there are not enough documents, index them all using single thread
-      if (perThread < 1) {
+      if (perThread < 10) {
         indexDocs(ids)
       } else {
 

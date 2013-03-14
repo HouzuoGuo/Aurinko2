@@ -16,6 +16,9 @@ class DatabaseTest extends FunSuite {
     assert(db.get("a") != null)
     assert(db.get("b") != null)
 
+    // Get all collection names
+    assert(db.all == Set("a", "b"))
+
     // Rename collection
     db.rename("b", "c")
     intercept[Exception] {

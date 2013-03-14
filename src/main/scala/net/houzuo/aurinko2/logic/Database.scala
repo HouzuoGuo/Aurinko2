@@ -63,6 +63,14 @@ class Database(val path: String) {
     } finally { syncher.unlock() }
   }
 
+  /** Return all collection names. */
+  def all: Set[String] = {
+    syncher.lock()
+    try {
+      return collections.keySet.toSet
+    } finally { syncher.unlock() }
+  }
+
   /** Rename a collection. References to the old collection will no longer work. */
   def rename(from: String, to: String) {
     syncher.lock()

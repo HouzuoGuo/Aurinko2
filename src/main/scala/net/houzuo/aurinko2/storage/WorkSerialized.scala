@@ -10,7 +10,7 @@ import scala.concurrent.promise
 case class Output[T](var data: T)
 
 /**
- * Serialized work loads.
+ * Serialized work loads. Guaranteed fairness.
  */
 trait WorkSerialized[I] {
   private val queue = new LinkedBlockingQueue[Tuple2[I, Promise[I]]]

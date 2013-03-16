@@ -29,7 +29,7 @@ object SimpleIO {
 
     if (dir.isFile() && !dir.delete())
       failures += dir.getAbsolutePath()
-    else {
+    else if (dir.isDirectory()) {
       for (file <- dir.listFiles())
         rmrf(file)
       dir.delete()

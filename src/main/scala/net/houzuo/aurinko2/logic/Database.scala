@@ -5,9 +5,11 @@ import java.io.IOException
 import java.nio.file.Paths
 import java.util.concurrent.locks.ReentrantLock
 import java.util.logging.Logger
+
+import scala.Array.canBuildFrom
 import scala.collection.mutable.HashMap
+
 import net.houzuo.aurinko2.io.SimpleIO
-import net.houzuo.aurinko2.Main
 
 object Database {
   val LOG = Logger.getLogger(classOf[Database].getName())

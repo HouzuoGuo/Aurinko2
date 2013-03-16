@@ -22,7 +22,7 @@ import scala.xml.XML
 import scala.xml.XML.loadString
 
 import net.houzuo.aurinko2.io.SimpleIO.spit
-import net.houzuo.aurinko2.storage.{Collection => CollFile}
+import net.houzuo.aurinko2.storage.{ Collection => CollFile }
 import net.houzuo.aurinko2.storage.CollectionDelete
 import net.houzuo.aurinko2.storage.CollectionInsert
 import net.houzuo.aurinko2.storage.CollectionRead
@@ -73,12 +73,12 @@ class Collection(val path: String) {
   // Load configuration file
   val configFile = new File(configFilename)
 
-  if (!configFile.exists() && !configFile.createNewFile())
-    throw new IOException(s"Collection does not have config file and failed to create it: $path/config")
-  else {
-    spit(configFile.getAbsolutePath(), Seq("<root></root>"))
-    Collection.LOG.info(s"Empty config file $path/config has been created")
-  }
+  if (!configFile.exists())
+    if (configFile.createNewFile()) {
+      spit(configFile.getAbsolutePath(), Seq("<root></root>"))
+      Collection.LOG.info(s"Empty config file $path/config has been created")
+    } else
+      throw new IOException(s"Collection does not have config file and failed to create it: $path/config")
 
   if (!(configFile.canRead() && configFile.canWrite()))
     throw new IOException(s"Config file $configFilename is not RW to you")

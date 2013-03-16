@@ -9,7 +9,6 @@ import org.scalatest.FunSuite
 import TemporaryFactory.collection
 import net.houzuo.aurinko2.test.TimedExecution.average
 import net.houzuo.aurinko2.test.TimedExecution.time
-import net.houzuo.aurinko2.Main.parallelLevel
 
 class Benchmark extends FunSuite {
 
@@ -19,6 +18,7 @@ class Benchmark extends FunSuite {
    * This benchmark spawns multiple threads to simulate concurrent read and write operations.
    */
   test("collection storage layer performance benchmark") {
+    val parallelLevel = Runtime.getRuntime().availableProcessors() * 2
     val iterations = 200000
     val positions = new ArrayBuffer[Int](iterations)
     val col = collection

@@ -7,6 +7,8 @@ import scala.collection.mutable.ListBuffer
 import scala.concurrent.Promise
 import scala.math.max
 import scala.math.pow
+import scala.util.control.Breaks.break
+import scala.util.control.Breaks.breakable
 
 // Workloads
 abstract class HashWork
@@ -119,7 +121,7 @@ class Hash(
   def allEntries = {
     val result = new ListBuffer[Tuple2[Int, Int]]()
     for (bucket <- 0 until numberOfBuckets)
-      try {
+      breakable {
         for (entry <- 0 until perBucket) {
           buf.position(bucket * bucketSize + Hash.BUCKET_HEADER_SIZE + entry * Hash.ENTRY_SIZE)
           val entryPos = buf.position()
@@ -128,14 +130,14 @@ class Hash(
           val value = buf.getInt()
 
           if (validity == 0 && entryKey == 0 && value == 0)
-            throw new Exception("Break") // Scala never takes a break
+            break
 
           if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
             Hash.LOG.severe(s"Hash corruption - invalid entry header at $entryPos")
           else if (validity == Hash.ENTRY_VALID)
             result += Tuple2(entryKey, value)
         }
-      } catch { case e: Exception => }
+      }
     result.toList
   }
 

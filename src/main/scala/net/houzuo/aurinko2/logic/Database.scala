@@ -128,7 +128,7 @@ class Database(val path: String) {
       // Get all document IDs
       val ids = toRepair.all().toArray
       if (ids.size > 0) {
-        val perThread = ids.size / Main.parallelLevel
+        val perThread = ids.size / Runtime.getRuntime().availableProcessors() * 2
         if (perThread < 10) {
           copyDocs(ids)
         } else {

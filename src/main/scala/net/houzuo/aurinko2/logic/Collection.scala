@@ -1,11 +1,13 @@
 package net.houzuo.aurinko2.logic
 
 import java.io.File
+import java.io.IOException
 import java.io.RandomAccessFile
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.logging.Logger
+
 import scala.Array.canBuildFrom
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
@@ -18,9 +20,9 @@ import scala.xml.NodeSeq
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
-import net.houzuo.aurinko2.Main
+
 import net.houzuo.aurinko2.io.SimpleIO.spit
-import net.houzuo.aurinko2.storage.{ Collection => CollFile }
+import net.houzuo.aurinko2.storage.{Collection => CollFile}
 import net.houzuo.aurinko2.storage.CollectionDelete
 import net.houzuo.aurinko2.storage.CollectionInsert
 import net.houzuo.aurinko2.storage.CollectionRead
@@ -30,13 +32,10 @@ import net.houzuo.aurinko2.storage.HashGetAll
 import net.houzuo.aurinko2.storage.HashPut
 import net.houzuo.aurinko2.storage.HashRemove
 import net.houzuo.aurinko2.storage.HashSync
-import net.houzuo.aurinko2.storage.HashWork
 import net.houzuo.aurinko2.storage.Output
-import java.io.IOException
 
 object Collection {
-
-  val TIMEOUT = 120000 // IO waiting timeout in milliseconds
+  val IO_TIMEOUT = 120000 // IO waiting timeout in milliseconds
   private val LOG = Logger.getLogger(classOf[Collection].getName())
 
   /** "Get into" an XML document, given a path. */
@@ -60,7 +59,6 @@ object Collection {
 }
 
 class Collection(val path: String) {
-
   private val configFilename = Paths.get(path, "config").toString
 
   Collection.LOG.info(s"Opening collection $path")
@@ -75,13 +73,12 @@ class Collection(val path: String) {
   // Load configuration file
   val configFile = new File(configFilename)
 
-  if (!configFile.exists())
-    if (!configFile.createNewFile())
-      throw new IOException(s"Collection does not have config file and failed to create $path/config")
-    else {
-      spit(configFile.getAbsolutePath(), Seq("<root></root>"))
-      Collection.LOG.info(s"Empty config file $path/config has been created")
-    }
+  if (!configFile.exists() && !configFile.createNewFile())
+    throw new IOException(s"Collection does not have config file and failed to create it: $path/config")
+  else {
+    spit(configFile.getAbsolutePath(), Seq("<root></root>"))
+    Collection.LOG.info(s"Empty config file $path/config has been created")
+  }
 
   if (!(configFile.canRead() && configFile.canWrite()))
     throw new IOException(s"Config file $configFilename is not RW to you")
@@ -123,6 +120,9 @@ class Collection(val path: String) {
 
   Collection.LOG.info(s"Successfully loaded collection $path")
 
+  private def sync[T](p: Promise[T]*) = p foreach { each => Await.result(each.future, Collection.IO_TIMEOUT millisecond) }
+  private def sync[T](p: Iterable[Promise[T]]) = p foreach { each => Await.result(each.future, Collection.IO_TIMEOUT millisecond) }
+
   /** Create a new index. */
   def index(path: List[String], bits: Int, perBucket: Int) {
     if (hashes.contains(path))
@@ -147,7 +147,7 @@ class Collection(val path: String) {
 
     val ids = all().toArray
     if (ids.size > 0) {
-      val perThread = ids.size / Main.parallelLevel
+      val perThread = ids.size / Runtime.getRuntime().availableProcessors() * 2
 
       // When there are not enough documents, index them all using single thread
       if (perThread < 10) {
@@ -163,7 +163,7 @@ class Collection(val path: String) {
         indexers foreach { _.start() }
         indexers foreach { _.join() }
       }
-      Await.result(newIndex.offer(HashSync(() => {})).future, Collection.TIMEOUT millisecond)
+      sync(newIndex.offer(HashSync(() => {})))
     }
 
     saveConfig()
@@ -185,7 +185,7 @@ class Collection(val path: String) {
   /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
   def read(id: Int): Option[Elem] = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
-    Await.result(collection.offer(work).future, Collection.TIMEOUT millisecond)
+    sync(collection.offer(work))
     if (work.data.data == null)
       return None
     try {
@@ -198,38 +198,32 @@ class Collection(val path: String) {
   }
 
   /** Put a document into all indexes. */
-  def indexDoc(doc: Elem, id: Int) = {
-    val promises = new ListBuffer[Promise[HashWork]]
-    hashes foreach { index =>
-      for (toIndex <- Collection.getIn(doc, index._1))
-        promises += index._2._2.offer(HashPut(toIndex.hashCode(), id))
-    }
-    promises.toList
-  }
+  def indexDoc(doc: Elem, id: Int) =
+    for (
+      index <- hashes;
+      toIndex <- Collection.getIn(doc, index._1)
+    ) yield index._2._2.offer(HashPut(toIndex.hashCode(), id))
 
   /** Remove a document from all indexes. */
-  def unindexDoc(doc: Elem, id: Int) = {
-    val promises = new ListBuffer[Promise[HashWork]]
-    hashes map { index =>
-      for (toIndex <- Collection.getIn(doc, index._1))
-        promises += index._2._2.offer(HashRemove(toIndex.hashCode(), 1, (_, value) => value == id))
-    }
-    promises.toList
-  }
+  def unindexDoc(doc: Elem, id: Int) =
+    for (
+      index <- hashes;
+      toIndex <- Collection.getIn(doc, index._1)
+    ) yield index._2._2.offer(HashRemove(toIndex.hashCode(), 1, (_, value) => value == id))
 
   /** Insert a document, return its ID. */
   def insert(doc: Elem) = {
 
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
-    Await.result(collection.offer(colInsert).future, Collection.TIMEOUT millisecond)
+    sync(collection.offer(colInsert))
 
-    // Insert to log , ID index and other indexes
+    // Insert to indexes
     val idPromise = idIndex.offer(HashPut(colInsert.pos.data.hashCode, colInsert.pos.data))
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
-    // Wait for log and indexes
-    idPromise :: indexPromises foreach { promise => Await.result(promise.future, Collection.TIMEOUT millisecond) }
+    // Wait for them to finish
+    sync(idPromise); sync(indexPromises)
 
     colInsert.pos.data
   }
@@ -246,12 +240,12 @@ class Collection(val path: String) {
         val idRemovePromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
 
         // Wait for document update
-        Await.result(updatePromise.future, Collection.TIMEOUT millisecond)
+        sync(updatePromise)
         val indexPromises = indexDoc(doc, colUpdate.pos.data)
         val idPutPromise = idIndex.offer(HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data))
 
         // Wait for indexes
-        idPutPromise :: idRemovePromise :: indexPromises ::: unindexPromises foreach { promise => Await.result(promise.future, Collection.TIMEOUT millisecond) }
+        sync(idPutPromise, idRemovePromise); sync(indexPromises)
 
         Some(colUpdate.pos.data)
       case None => None
@@ -273,8 +267,7 @@ class Collection(val path: String) {
         val idPromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
 
         // Wait for collection and indexes
-        Await.result(colPromise.future, Collection.TIMEOUT millisecond)
-        idPromise :: unindexPromises foreach { promise => Await.result(promise.future, Collection.TIMEOUT millisecond) }
+        sync(colPromise); sync(idPromise); sync(unindexPromises)
       case None =>
     }
   }
@@ -282,7 +275,7 @@ class Collection(val path: String) {
   /** Get all document IDs. */
   def all() = {
     val work = HashGetAll(new Output[List[Tuple2[Int, Int]]](null))
-    Await.result(idIndex.offer(work).future, Collection.TIMEOUT millisecond)
+    sync(idIndex.offer(work))
     work.result.data.map(_._2)
   }
 

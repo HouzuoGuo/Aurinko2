@@ -20,6 +20,10 @@ class Database(val path: String) {
   private val collections = new HashMap[String, Collection]
   private val dbDir = new File(path)
 
+  // Create the directory if it does not exist yet
+  if (!dbDir.exists() && !dbDir.mkdirs())
+    throw new IOException(s"$path does not exist and failed to create it")
+
   // Test open directory
   if (!(dbDir.exists() && dbDir.isDirectory() &&
     dbDir.canRead() && dbDir.canWrite() && dbDir.canExecute()))
@@ -109,10 +113,12 @@ class Database(val path: String) {
     } finally { syncher.unlock() }
   }
 
+  /** Repair a collection. */
   def repair(name: String) {
     syncher.lock()
     try {
       val toRepair = get(name)
+      val originalIndexes = toRepair.hashes
       val tmp = "repair" + System.nanoTime().toString
       create(tmp)
       val tmpCol = get(tmp)
@@ -146,10 +152,30 @@ class Database(val path: String) {
         }
       }
 
+      // Add indexes back
+      for (indexedPath <- originalIndexes)
+        tmpCol.index(indexedPath._1, indexedPath._2._2.hashBits, indexedPath._2._2.bucketSize)
+
       // Start using the repaired collection
       drop(name)
       rename(tmp, name)
     } finally { syncher.unlock() }
+  }
+
+  /** Flush all data files. */
+  def save() {
+    for (
+      colName <- all;
+      col = get(colName)
+    ) col.save()
+  }
+
+  /** Save all data files and then close them. Do not use this database object after calling close.*/
+  def close() {
+    for (
+      colName <- all;
+      col = get(colName)
+    ) col.close()
   }
 
 }

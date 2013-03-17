@@ -100,7 +100,7 @@ class Collection(val path: String) {
         Collection.LOG.info(s"Loading hash index $filename")
         hashes.put(((hash \ "path").map { _.text }).toList,
           (filename.text,
-            new Hash(new RandomAccessFile(filename.text, "rw").getChannel(),
+            new Hash(new RandomAccessFile(Paths.get(path, filename.text).toString, "rw").getChannel(),
               hash.attribute("bits") match {
                 case Some(bits) => bits.text.toInt
                 case None       => throw new Exception(s"Index $filename has hash number of bits undefined")
@@ -129,8 +129,8 @@ class Collection(val path: String) {
       throw new Exception(s"Collection ${this.path} already has $path indexed")
 
     val lastSegment = path(path.size - 1)
-    val filename = Paths.get(this.path, lastSegment.substring(0, min(100, lastSegment.length())) + System.nanoTime().toString).toString
-    val newIndex = new Hash(new RandomAccessFile(filename.toString, "rw").getChannel(), bits, perBucket)
+    val filename = lastSegment.substring(0, min(100, lastSegment.length())) + System.nanoTime().toString
+    val newIndex = new Hash(new RandomAccessFile(Paths.get(this.path, filename).toString, "rw").getChannel(), bits, perBucket)
     hashes += ((path, (filename, newIndex)))
 
     // Index documents given their ID
@@ -175,7 +175,7 @@ class Collection(val path: String) {
       throw new Exception(s"Collection ${this.path} does not have $path indexed")
 
     val filename = hashes(path)._1
-    if (!new File(filename).delete())
+    if (!new File(Paths.get(this.path, filename).toString).delete())
       throw new Exception(s"Cannot delete index file $filename")
 
     hashes -= path
@@ -307,14 +307,14 @@ class Collection(val path: String) {
   /** Return number of queued operations. */
   def load = (hashes.map { hash => hash._1 -> hash._2._2.queueLength }).toMap ++ Map("idIndex" -> idIndex.queueLength, "data" -> collection.queueLength)
 
-  /** Flush all collection changes to disk. */
+  /** Flush all data files. */
   def save() {
     collection.force()
     hashes foreach { _._2._2.force() }
     Collection.LOG.info(s"Collection $path saved at ${new SimpleDateFormat("yyyy-MM-DD HH:mm:ss").format(new Date)}")
   }
 
-  /** Save and close the collection. */
+  /** Save all data files and then close them. Do not use this collection object after calling close. */
   def close() {
     collection.close()
     hashes foreach { _._2._2.force() }

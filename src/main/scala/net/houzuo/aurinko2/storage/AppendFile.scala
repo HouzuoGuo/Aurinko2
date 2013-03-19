@@ -23,8 +23,8 @@ abstract class AppendFile(
   protected var appendAt = buf.limit / 2
 
   // Find next appending position using binary search (the position must have data 0L)
-  var left = 0
-  var right = buf.limit
+  private var left = 0
+  private var right = buf.limit
   while (right - left > 1) {
     buf.position(appendAt)
     if (buf.getLong() == 0) {
@@ -42,8 +42,8 @@ abstract class AppendFile(
     appendAt -= 1
 
   // Fix "off by one or two"
-  val int1 = buf.getInt()
-  val int2 = buf.getInt()
+  private val int1 = buf.getInt()
+  private val int2 = buf.getInt()
   if (int2 != 0)
     appendAt += 8
   else if (int1 != 0)

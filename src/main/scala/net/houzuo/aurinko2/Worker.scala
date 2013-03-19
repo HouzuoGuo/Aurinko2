@@ -199,6 +199,46 @@ class Worker(val db: Database, val sock: Socket) {
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
+
+      // Get indexed paths in collection
+      case "indexed" => respond {
+        req.attribute("col") match {
+          case Some(colName) =>
+            val col = db.get(colName.text)
+            Some(<indexes> {
+              for (hash <- col.hashes) yield <index type="hash" hash-bits={ hash._2._2.hashBits.toString } bucket-size={ hash._2._2.perBucket.toString }> {
+                for (pathSegment <- hash._1) yield <path>{ pathSegment }</path>
+              }</index>
+            }</indexes>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
+
+      // Put a hash index on collection
+      case "hash-index" => respond {
+        req.attribute("col") match {
+          case Some(colName) =>
+            db.get(colName.text).index(req.child.map(_.text).toList, req.attribute("hash-bits") match {
+              case Some(number) => number.text.toInt
+              case None         => 12
+            }, req.attribute("bucket-size") match {
+              case Some(number) => number.text.toInt
+              case None         => 100
+            })
+            None
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
+
+      // Drop a index
+      case "drop-index" => respond {
+        req.attribute("col") match {
+          case Some(colName) =>
+            db.get(colName.text).unindex(req.child.map(_.text).toList)
+            None
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
     }
   }
 }

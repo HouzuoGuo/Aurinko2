@@ -19,8 +19,8 @@ object SimpleIO {
       throw new IOException(s"You do not have permission to write to $filename")
 
     val writer = new BufferedWriter(new FileWriter(file, append))
-    writer.write(lines.mkString("\n"))
-    writer.close()
+    writer write lines.mkString("\n")
+    writer close ()
   }
 
   /** Remove a directory and everything underneath it.*/
@@ -28,11 +28,11 @@ object SimpleIO {
     val failures = new ListBuffer[String]
 
     if (dir.isFile() && !dir.delete())
-      failures += dir.getAbsolutePath()
-    else if (dir.isDirectory()) {
-      for (file <- dir.listFiles())
+      failures += dir getAbsolutePath ()
+    else if (dir isDirectory ()) {
+      for (file <- dir listFiles ())
         rmrf(file)
-      dir.delete()
+      dir delete ()
     }
   }
 }

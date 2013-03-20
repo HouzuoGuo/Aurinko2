@@ -20,7 +20,7 @@ case class HashSync(fun: () => Unit) extends HashWork
 case class HashGetAll(result: Output[List[Tuple2[Int, Int]]]) extends HashWork
 
 object Hash {
-  val LOG = Logger.getLogger(classOf[Hash].getName())
+  val LOG = Logger getLogger classOf[Hash].getName()
 
   /*
    * Hash file grows by 64MB when full.
@@ -52,7 +52,7 @@ class Hash(
   if (appendAt % bucketSize != 0)
     appendAt += bucketSize - appendAt % bucketSize
 
-  Hash.LOG.info(s"Hash table file is opened. Bucket size is $bucketSize, initial file size is ${minSize}")
+  Hash.LOG info s"Hash table file is opened. Bucket size is $bucketSize, initial file size is ${minSize}"
 
   /** Return the last N bits of the integer key. It is used for choosing a bucket when inserting into hash table. */
   def hashKey(key: Int) = key & ((1 << hashBits) - 1)
@@ -65,7 +65,7 @@ class Hash(
     buf.position(bucket * bucketSize)
     val nextBucket = buf.getInt()
     if (nextBucket < bucket && nextBucket != 0) {
-      Hash.LOG.severe(s"bucket chain $bucket is a loop - repair collection?")
+      Hash.LOG severe s"bucket chain $bucket is a loop - repair collection?"
       return 0
     }
     return nextBucket
@@ -81,7 +81,7 @@ class Hash(
 
   /** Put a new bucket in the bucket chain. */
   private def grow(bucket: Int) {
-    Hash.LOG.info(s"Growing a bucket in chain $bucket, new bucket's number is ${numberOfBuckets}")
+    Hash.LOG info s"Growing a bucket in chain $bucket, new bucket's number is ${numberOfBuckets}"
     buf.position(last(bucket) * bucketSize)
     buf.putInt(numberOfBuckets)
     checkGrow(bucketSize)
@@ -106,7 +106,7 @@ class Hash(
           return result.toList
 
         if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
-          Hash.LOG.severe(s"Hash corruption - invalid entry header at $entryPos")
+          Hash.LOG severe s"Hash corruption - invalid entry header at $entryPos"
         else if (validity == Hash.ENTRY_VALID && entryKey == key && filter(entryKey, value)) {
           procFun(entryPos)
           result += Tuple2(entryKey, value)
@@ -133,7 +133,7 @@ class Hash(
             break
 
           if (validity != Hash.ENTRY_VALID && validity != Hash.ENTRY_INVALID)
-            Hash.LOG.severe(s"Hash corruption - invalid entry header at $entryPos")
+            Hash.LOG severe s"Hash corruption - invalid entry header at $entryPos"
           else if (validity == Hash.ENTRY_VALID)
             result += Tuple2(entryKey, value)
         }
@@ -180,28 +180,28 @@ class Hash(
       case HashGet(key, limit, filter, result) =>
         try {
           result.data = get(key, limit, filter)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case HashPut(key, value) =>
         try {
           put(key, value)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case HashRemove(key, limit, filter) =>
         try {
           remove(key, limit, filter)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case HashSync(fun) =>
         try {
           fun()
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case HashGetAll(result) =>
         try {
           result.data = allEntries
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
     }
   }
 }

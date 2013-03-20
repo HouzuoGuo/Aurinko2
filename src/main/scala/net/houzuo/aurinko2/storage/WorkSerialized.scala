@@ -23,7 +23,7 @@ trait WorkSerialized[I] {
   }
 
   /** Return length of the work queue. */
-  def queueLength = queue.size()
+  def queueLength = queue.size
 
   /** Start working. */
   new Thread {

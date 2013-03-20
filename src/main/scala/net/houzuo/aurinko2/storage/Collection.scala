@@ -14,7 +14,7 @@ case class CollectionRead(id: Int, data: Output[Array[Byte]]) extends Collection
 case class CollectionSync(fun: () => Unit) extends CollectionWork
 
 object Collection {
-  val LOG = Logger.getLogger(classOf[Hash].getName())
+  val LOG = Logger getLogger classOf[Hash].getName
 
   /*
    * Collection file grows by 64MB when full.
@@ -57,7 +57,7 @@ class Collection(
 
     // Possible document header corruption, better repair the collection
     if (room > Collection.MAX_DOC_ROOM) {
-      Collection.LOG.severe(s"Document $id has a header corruption - repair collection?")
+      Collection.LOG severe s"Document $id has a header corruption - repair collection?"
       return null
     }
     val data = Array.ofDim[Byte](room)
@@ -73,14 +73,13 @@ class Collection(
     var id = -1
     val len = doc.length
     val room = len + len * Collection.DOC_PADDING
-    val padding =
-      id = appendAt
+    id = appendAt
     checkGrow(room)
     buf.position(appendAt)
     buf.putInt(Collection.DOC_VALID)
     buf.putInt(room)
     buf.put(doc)
-    buf.put(" ".*(len * Collection.DOC_PADDING).getBytes())
+    buf.put(" ".*(len * Collection.DOC_PADDING) getBytes)
     appendAt += Collection.DOC_HEADER_SIZE + room
     id
   }
@@ -111,7 +110,7 @@ class Collection(
 
     if (room >= len) {
       buf.put(doc)
-      buf.put(" ".*(room - len).getBytes())
+      buf.put(" ".*(room - len) getBytes)
       return id
     } else {
       delete(id)
@@ -139,28 +138,28 @@ class Collection(
       case CollectionInsert(doc, pos) =>
         try {
           pos.data = insert(doc)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case CollectionUpdate(id, doc, pos) =>
         try {
           pos.data = update(id, doc)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case CollectionDelete(id) =>
         try {
           delete(id)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case CollectionRead(id, data) =>
         try {
           data.data = read(id)
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
       case CollectionSync(fun) =>
         try {
           fun()
-          promise.success(work)
-        } catch { case e: Exception => promise.failure(e) }
+          promise success work
+        } catch { case e: Exception => promise failure e }
     }
   }
 }

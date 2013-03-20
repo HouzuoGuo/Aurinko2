@@ -49,14 +49,14 @@ abstract class AppendFile(
   else if (int1 != 0)
     appendAt += 4
 
-  AppendFile.LOG.info(s"File is opened, append position is at $appendAt")
+  AppendFile.LOG info s"File is opened, append position is at $appendAt"
 
   /** Re-map the file if more room is needed for appending the size of data. */
   protected def checkGrow(size: Int) {
     if (appendAt + size <= buf.limit)
       return
 
-    AppendFile.LOG.info(s"Append position is at $appendAt. File is grown by $growBy bytes because there is not enough room for $size bytes.")
+    AppendFile.LOG info s"Append position is at $appendAt. File is grown by $growBy bytes because there is not enough room for $size bytes."
     force()
     buf = fc.map(MapMode.READ_WRITE, 0, buf.limit + growBy)
   }

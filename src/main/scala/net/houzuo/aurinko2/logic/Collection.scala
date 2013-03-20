@@ -36,16 +36,16 @@ import net.houzuo.aurinko2.storage.Output
 
 object Collection {
   val IO_TIMEOUT = 120000 // IO waiting timeout in milliseconds
-  private val LOG = Logger.getLogger(classOf[Collection].getName())
+  private val LOG = Logger getLogger classOf[Collection].getName
 
   /** "Get into" an XML document, given a path. */
   def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
     if (path.size == 0) {
       (nodes map { node =>
         if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
-          node.toString // Index XML element
+          node toString // Index XML element
         else
-          node.child.mkString("") // Index XML non-element
+          node.child mkString "" // Index XML non-element
       }).toList
     } else {
       val ret = new ListBuffer[String]
@@ -61,7 +61,7 @@ object Collection {
 class Collection(val path: String) {
   private val configFilename = Paths.get(path, "config").toString
 
-  Collection.LOG.info(s"Opening collection $path")
+  Collection.LOG info s"Opening collection $path"
 
   // Test open collection directory
   private val testOpen = new File(path)
@@ -76,7 +76,7 @@ class Collection(val path: String) {
   if (!configFile.exists())
     if (configFile.createNewFile()) {
       spit(configFile.getAbsolutePath(), Seq("<root></root>"))
-      Collection.LOG.info(s"Empty config file $path/config has been created")
+      Collection.LOG info s"Empty config file $path/config has been created"
     } else
       throw new IOException(s"Collection does not have config file and failed to create it: $path/config")
 
@@ -95,30 +95,30 @@ class Collection(val path: String) {
   // Parse collection indexes
   val hashes = new HashMap[List[String], Tuple2[String, Hash]]
   (config \ "hash").foreach { hash =>
-    hash.attribute("file") match {
+    hash attribute "file" match {
       case Some(filename) =>
-        Collection.LOG.info(s"Loading hash index $filename")
-        hashes.put(((hash \ "path").map { _.text }).toList,
-          (filename.text,
-            new Hash(new RandomAccessFile(Paths.get(path, filename.text).toString, "rw").getChannel(),
-              hash.attribute("bits") match {
-                case Some(bits) => bits.text.toInt
+        Collection.LOG info s"Loading hash index $filename"
+        hashes.put((hash \ "path") map { _.text } toList,
+          (filename text,
+            new Hash(new RandomAccessFile(Paths.get(path, filename text) toString, "rw") getChannel,
+              hash attribute "bits" match {
+                case Some(bits) => bits.text toInt
                 case None       => throw new Exception(s"Index $filename has hash number of bits undefined")
               },
-              hash.attribute("per_bucket") match {
-                case Some(entries) => entries.text.toInt
+              hash attribute "per_bucket" match {
+                case Some(entries) => entries.text toInt
                 case None          => throw new Exception(s"Index $filename has index entries per bucket undefined")
               })))
       case None =>
-        Collection.LOG.severe("An index exists in configuration file but without a file name. It is skipped.")
+        Collection.LOG severe "An index exists in configuration file but without a file name. It is skipped."
     }
   }
 
   // Open data files
-  val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data").toString, "rw").getChannel())
-  val idIndex = new Hash(new RandomAccessFile(Paths.get(path, "id").toString, "rw").getChannel(), 14, 100)
+  val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data") toString, "rw") getChannel)
+  val idIndex = new Hash(new RandomAccessFile(Paths.get(path, "id") toString, "rw") getChannel, 14, 100)
 
-  Collection.LOG.info(s"Successfully loaded collection $path")
+  Collection.LOG info s"Successfully loaded collection $path"
 
   private def sync[T](p: Promise[T]*) = p foreach { each => Await.result(each.future, Collection.IO_TIMEOUT millisecond) }
   private def sync[T](p: Iterable[Promise[T]]) = p foreach { each => Await.result(each.future, Collection.IO_TIMEOUT millisecond) }
@@ -129,8 +129,8 @@ class Collection(val path: String) {
       throw new Exception(s"Collection ${this.path} already has $path indexed")
 
     val lastSegment = path(path.size - 1)
-    val filename = lastSegment.substring(0, min(100, lastSegment.length())) + System.nanoTime().toString
-    val newIndex = new Hash(new RandomAccessFile(Paths.get(this.path, filename).toString, "rw").getChannel(), bits, perBucket)
+    val filename = lastSegment.substring(0, min(100, lastSegment length)) + System.nanoTime() toString
+    val newIndex = new Hash(new RandomAccessFile(Paths.get(this.path, filename) toString, "rw") getChannel, bits, perBucket)
     hashes += ((path, (filename, newIndex)))
 
     // Index documents given their ID
@@ -139,7 +139,7 @@ class Collection(val path: String) {
         read(id) match {
           case Some(doc) =>
             for (toIndex <- Collection.getIn(doc, path))
-              newIndex.offer(HashPut(toIndex.hashCode(), id))
+              newIndex.offer(HashPut(toIndex hashCode, id))
           case None =>
         }
       }
@@ -147,12 +147,12 @@ class Collection(val path: String) {
 
     val ids = all().toArray
     if (ids.size > 0) {
-      val perThread = ids.size / Runtime.getRuntime().availableProcessors() * 2
+      val perThread = ids.size / Runtime.getRuntime().availableProcessors * 2
 
       // When there are not enough documents, index them all using single thread
-      if (perThread < 10) {
+      if (perThread < 10)
         indexDocs(ids)
-      } else {
+      else {
 
         // Using multiple threads to index all documents
         val indexers = for (i <- Array.range(0, ids.size, perThread)) yield new Thread {
@@ -163,7 +163,7 @@ class Collection(val path: String) {
         indexers foreach { _.start() }
         indexers foreach { _.join() }
       }
-      sync(newIndex.offer(HashSync(() => {})))
+      sync(newIndex offer HashSync(() => {}))
     }
 
     saveConfig()
@@ -175,7 +175,7 @@ class Collection(val path: String) {
       throw new Exception(s"Collection ${this.path} does not have $path indexed")
 
     val filename = hashes(path)._1
-    if (!new File(Paths.get(this.path, filename).toString).delete())
+    if (!new File(Paths.get(this.path, filename) toString).delete())
       throw new Exception(s"Cannot delete index file $filename")
 
     hashes -= path
@@ -185,7 +185,7 @@ class Collection(val path: String) {
   /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
   def read(id: Int): Option[Elem] = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
-    sync(collection.offer(work))
+    sync(collection offer work)
     if (work.data.data == null)
       return None
     try {
@@ -202,24 +202,24 @@ class Collection(val path: String) {
     for (
       index <- hashes;
       toIndex <- Collection.getIn(doc, index._1)
-    ) yield index._2._2.offer(HashPut(toIndex.hashCode(), id))
+    ) yield index._2._2 offer HashPut(toIndex hashCode, id)
 
   /** Remove a document from all indexes. */
   def unindexDoc(doc: Elem, id: Int) =
     for (
       index <- hashes;
       toIndex <- Collection.getIn(doc, index._1)
-    ) yield index._2._2.offer(HashRemove(toIndex.hashCode(), 1, (_, value) => value == id))
+    ) yield index._2._2 offer HashRemove(toIndex hashCode, 1, (_, value) => value == id)
 
   /** Insert a document, return its ID. */
   def insert(doc: Elem) = {
 
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
-    sync(collection.offer(colInsert))
+    sync(collection offer colInsert)
 
     // Insert to indexes
-    val idPromise = idIndex.offer(HashPut(colInsert.pos.data.hashCode, colInsert.pos.data))
+    val idPromise = idIndex offer HashPut(colInsert.pos.data.hashCode, colInsert.pos.data)
     val indexPromises = indexDoc(doc, colInsert.pos.data)
 
     // Wait for them to finish
@@ -235,14 +235,14 @@ class Collection(val path: String) {
 
         // Update document, remove old indexed value
         val colUpdate = CollectionUpdate(id, doc.toString.getBytes, new Output[Int](0))
-        val updatePromise = collection.offer(colUpdate)
+        val updatePromise = collection offer colUpdate
         val unindexPromises = unindexDoc(oldDoc, id)
-        val idRemovePromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
+        val idRemovePromise = idIndex offer HashRemove(id.hashCode(), 1, (_, value) => value == id)
 
         // Wait for document update
         sync(updatePromise)
         val indexPromises = indexDoc(doc, colUpdate.pos.data)
-        val idPutPromise = idIndex.offer(HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data))
+        val idPutPromise = idIndex offer HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data)
 
         // Wait for indexes
         sync(idPutPromise, idRemovePromise); sync(indexPromises)
@@ -258,13 +258,13 @@ class Collection(val path: String) {
       case Some(oldDoc) =>
 
         // Delete document
-        val colPromise = collection.offer(CollectionDelete(id))
+        val colPromise = collection offer CollectionDelete(id)
 
         // Unindex old document
         val unindexPromises = unindexDoc(oldDoc, id)
 
         // Unindex ID
-        val idPromise = idIndex.offer(HashRemove(id.hashCode(), 1, (_, value) => value == id))
+        val idPromise = idIndex offer HashRemove(id.hashCode(), 1, (_, value) => value == id)
 
         // Wait for collection and indexes
         sync(colPromise); sync(idPromise); sync(unindexPromises)
@@ -275,7 +275,7 @@ class Collection(val path: String) {
   /** Get all document IDs. */
   def all() = {
     val work = HashGetAll(new Output[List[Tuple2[Int, Int]]](null))
-    sync(idIndex.offer(work))
+    sync(idIndex offer work)
     work.result.data.map(_._2)
   }
 
@@ -283,8 +283,8 @@ class Collection(val path: String) {
   def saveConfig() {
 
     // Backup existing config to .bak
-    val source = scala.io.Source.fromFile(Paths.get(path, "config").toString)
-    spit(Paths.get(path, "config.bak").toString, Seq(source.mkString), false)
+    val source = scala.io.Source.fromFile(Paths.get(path, "config") toString)
+    spit(Paths.get(path, "config.bak") toString, Seq(source.mkString), false)
     source.close()
 
     // Overwrite current config file
@@ -292,12 +292,8 @@ class Collection(val path: String) {
       Seq(<root>{
         hashes.map {
           hash =>
-            <hash file={ hash._2._1 } bits={ hash._2._2.hashBits.toString } per_bucket={ hash._2._2.perBucket.toString }>
-              {
-                hash._1.map { segment =>
-                  <path>{ segment }</path>
-                }
-              }
+            <hash file={ hash._2._1 } bits={ hash._2._2.hashBits toString } per_bucket={ hash._2._2.perBucket toString }>
+              { hash._1.map { segment => <path>{ segment }</path> } }
             </hash>
         }
       }</root>.toString),

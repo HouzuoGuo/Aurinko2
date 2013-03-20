@@ -12,7 +12,7 @@ import scala.collection.mutable.HashMap
 import net.houzuo.aurinko2.io.SimpleIO
 
 object Database {
-  val LOG = Logger.getLogger(classOf[Database].getName())
+  val LOG = Logger getLogger classOf[Database].getName
 }
 
 class Database(val path: String) {
@@ -33,10 +33,10 @@ class Database(val path: String) {
   try {
     new File(path).listFiles() foreach { subfile =>
       try {
-        collections += ((subfile.getName(), new Collection(subfile.getAbsolutePath())))
+        collections += ((subfile.getName(), new Collection(subfile getAbsolutePath)))
       } catch {
         case e: Exception =>
-          Database.LOG.severe(s"Failed to open collection ${subfile.getAbsolutePath()}: " + e.getMessage())
+          Database.LOG severe s"Failed to open collection ${subfile getAbsolutePath}: " + e.getMessage
       }
     }
   } catch {
@@ -62,7 +62,7 @@ class Database(val path: String) {
   def get(name: String): Collection = {
     syncher.lock()
     try {
-      collections.get(name) match {
+      collections get name match {
         case Some(col) => return col
         case None      => throw new Exception(s"Collection $name does not exist")
       }
@@ -84,17 +84,17 @@ class Database(val path: String) {
       if (!collections.get(to).isEmpty)
         throw new Exception(s"Collection name $to is already in-use")
 
-      collections.get(from) match {
+      collections get from match {
         case Some(old) =>
           old.save()
-          val newPath = new File(Paths.get(path, to).toString)
+          val newPath = new File(Paths.get(path, to) toString)
           if (!newPath.mkdirs())
-            throw new IOException(s"Failed to rename ${old.path} to ${newPath.getAbsolutePath()}")
+            throw new IOException(s"Failed to rename ${old.path} to ${newPath getAbsolutePath}")
           if (!new File(old.path).renameTo(newPath))
-            throw new IOException(s"Failed to rename ${old.path} to ${newPath.getAbsolutePath()}")
+            throw new IOException(s"Failed to rename ${old.path} to ${newPath getAbsolutePath}")
 
           collections -= from
-          collections += ((to, new Collection(newPath.getAbsolutePath())))
+          collections += ((to, new Collection(newPath getAbsolutePath)))
         case None => throw new Exception(s"Collection $from does not exist")
       }
     } finally { syncher.unlock() }
@@ -104,7 +104,7 @@ class Database(val path: String) {
   def drop(name: String) {
     syncher.lock()
     try {
-      collections.get(name) match {
+      collections get name match {
         case Some(old) =>
           SimpleIO.rmrf(new File(old.path))
           collections -= name
@@ -126,8 +126,8 @@ class Database(val path: String) {
       // Copy documents from source to temporary collection
       def copyDocs(ids: Seq[Int]) {
         ids foreach { id =>
-          toRepair.read(id) match {
-            case Some(doc) => tmpCol.insert(doc)
+          toRepair read id match {
+            case Some(doc) => tmpCol insert doc
             case None      =>
           }
         }
@@ -137,9 +137,9 @@ class Database(val path: String) {
       val ids = toRepair.all().toArray
       if (ids.size > 0) {
         val perThread = ids.size / Runtime.getRuntime().availableProcessors() * 2
-        if (perThread < 10) {
+        if (perThread < 10)
           copyDocs(ids)
-        } else {
+        else {
 
           // Using multiple threads to copy documents across
           val inserts = for (i <- Array.range(0, ids.size, perThread)) yield new Thread {

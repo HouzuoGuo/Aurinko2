@@ -3,9 +3,6 @@ package net.houzuo.aurinko2
 import java.net.ServerSocket
 import java.util.logging.Logger
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.future
-
 import net.houzuo.aurinko2.logic.Database
 
 object Main {
@@ -22,16 +19,18 @@ object Main {
     val db = new Database(args(1))
 
     // Regularly flush all data files
-    future {
-      while (true) {
-        Thread sleep FLUSH_INTERVAL
-        for (
-          name <- db.all;
-          col = db get name
-        ) {
-          col.collection force ()
-          col.idIndex force ()
-          col.hashes foreach { _._2._2.force() }
+    new Thread {
+      override def run() {
+        while (true) {
+          Thread sleep FLUSH_INTERVAL
+          for (
+            name <- db.all;
+            col = db get name
+          ) {
+            col.collection force ()
+            col.idIndex force ()
+            col.hashes foreach { _._2._2.force() }
+          }
         }
       }
     }
@@ -41,7 +40,7 @@ object Main {
     while (true) {
       val incoming = server accept ()
       Main.LOG info s"Client connected from ${incoming.getRemoteSocketAddress toString}"
-      future { new Worker(db, incoming) }
+      new Thread { override def run() { new Worker(db, incoming) } }
     }
 
     // Flush all collections and close server socket when shutdown

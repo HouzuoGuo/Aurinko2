@@ -105,7 +105,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Create collection
       case "create" => respond {
-        req attribute ("name") match {
+        req attribute "name" match {
           case Some(name) =>
             db create name.text; None
           case None => Some(<err>Please specify collection name in "name" attribute</err>)
@@ -114,9 +114,9 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Rename collection
       case "rename" => respond {
-        req attribute ("old") match {
+        req attribute "old" match {
           case Some(oldName) =>
-            req attribute ("new") match {
+            req attribute "new" match {
               case Some(newName) =>
                 db rename (oldName.text, newName.text); None
               case None => Some(<err>Please spicify new collection in "new" attribute</err>)
@@ -127,7 +127,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Drop collection
       case "drop" => respond {
-        req attribute ("name") match {
+        req attribute "name" match {
           case Some(name) =>
             db drop name.text; None
           case None => Some(<err>Please specify collection name in "name" attribute</err>)
@@ -136,7 +136,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Repair collection
       case "repair" => respond {
-        req attribute ("name") match {
+        req attribute "name" match {
           case Some(name) =>
             db repair name.text; None
           case None => Some(<err>Please specify collection name in "name" attribute</err>)
@@ -145,7 +145,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Insert documents
       case "insert" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
             Some(<inserted>{ for (doc <- req.child) yield <id>{ col insert doc.asInstanceOf[Elem] }</id> }</inserted>)
@@ -155,7 +155,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Update documents
       case "update" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
             Some(<updated>{
@@ -172,7 +172,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Delete documents
       case "delete" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
             for (toDelete <- req.child)
@@ -184,7 +184,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Get all documents
       case "findall" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             val col = db.get(colName.text)
             Some(<collection>{
@@ -201,7 +201,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Get indexed paths in collection
       case "indexed" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
             Some(<indexes> {
@@ -215,7 +215,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Put a hash index on collection
       case "hash-index" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             (db get colName.text).index(req.child.map(_.text) toList, req attribute ("hash-bits") match {
               case Some(number) => number.text toInt
@@ -231,7 +231,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Drop a index
       case "drop-index" => respond {
-        req attribute ("col") match {
+        req attribute "col" match {
           case Some(colName) =>
             (db get colName.text) unindex (req.child.map(_.text) toList)
             None

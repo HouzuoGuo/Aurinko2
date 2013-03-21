@@ -35,5 +35,5 @@ trait WorkSerialized[I] {
     }
   }.start()
 
-  def workOn(work: I, result: Promise[I])
+  protected def workOn(work: I, result: Promise[I])
 }

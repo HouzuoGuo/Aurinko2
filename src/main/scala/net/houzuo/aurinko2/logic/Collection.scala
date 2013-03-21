@@ -45,7 +45,7 @@ object Collection {
         if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
           node toString // Index XML element
         else
-          node.child mkString "" // Index XML non-element
+          node text // Index XML text
       }).toList
     } else {
       val ret = new ListBuffer[String]
@@ -120,8 +120,8 @@ class Collection(val path: String) {
 
   Collection.LOG info s"Successfully loaded collection $path"
 
-  private def sync[T](p: Promise[T]*) = p foreach { each => Await.result(each.future, Collection.IO_TIMEOUT millisecond) }
-  private def sync[T](p: Iterable[Promise[T]]) = p foreach { each => Await.result(each.future, Collection.IO_TIMEOUT millisecond) }
+  private def sync[T](p: Promise[T]) = Await.result(p future, Collection.IO_TIMEOUT millisecond)
+  private def sync[T](p: Iterable[Promise[T]]) = p foreach { each => Await.result(each future, Collection.IO_TIMEOUT millisecond) }
 
   /** Create a new index. */
   def index(path: List[String], bits: Int, perBucket: Int) {
@@ -245,7 +245,7 @@ class Collection(val path: String) {
         val idPutPromise = idIndex offer HashPut(colUpdate.pos.data.hashCode, colUpdate.pos.data)
 
         // Wait for indexes
-        sync(idPutPromise, idRemovePromise); sync(indexPromises)
+        sync(idPutPromise); sync(idRemovePromise); sync(indexPromises)
 
         Some(colUpdate.pos.data)
       case None => None

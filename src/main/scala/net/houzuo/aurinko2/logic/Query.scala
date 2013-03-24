@@ -1,31 +1,35 @@
 package net.houzuo.aurinko2.logic
 
 import java.util.logging.Logger
-import scala.collection.mutable.ListBuffer
+
+import scala.collection.mutable.HashSet
+import scala.collection.mutable.SetBuilder
+import scala.concurrent.Await
+import scala.concurrent.Promise
+import scala.concurrent.duration.DurationInt
 import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.NodeSeq
+
 import net.houzuo.aurinko2.storage.HashGet
 import net.houzuo.aurinko2.storage.Output
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
-import scala.concurrent.Promise
 
 object Query {
   val LOG = Logger getLogger classOf[Query].getName
   val IO_TIMEOUT = 120000 // IO waiting timeout in milliseconds
 }
 
-class Query(val query: Node, val col: Collection) {
-  Query.LOG fine query.toString
+class Query(val col: Collection) {
 
   private def sync[T](p: Promise[T]) = Await.result(p future, Query.IO_TIMEOUT millisecond)
   private def sync[T](p: Iterable[Promise[T]]) = p foreach { each => Await.result(each future, Query.IO_TIMEOUT millisecond) }
 
-  /*
+  /**
+   * Find documents using index look-up (very efficient) or collection scan (inefficient).
+   * Support "limit" and "skip" parameters as well, for example:
    * <eq limit="1" skip="1">
    *   <to>
-   *     <performance>100%</performance>
+   *     <performance>$1000</performance>
    *   </to>
    *   <in>
    *     <path>sales</path>
@@ -33,7 +37,7 @@ class Query(val query: Node, val col: Collection) {
    *   </in>
    * </eq>
    */
-  def eq(op: Node): List[Int] = {
+  def qeq(op: Node): Set[Int] = {
     val children = op.child.map { c => c.label -> c } toMap
     val path = children get "in" match {
       case Some(in) => in.child map (_.text) toList
@@ -42,10 +46,6 @@ class Query(val query: Node, val col: Collection) {
     val limit = op attribute "limit" match {
       case Some(number) => number.text toInt
       case None         => Int.MaxValue
-    }
-    val skip = op attribute "limit" match {
-      case Some(number) => number.text.toInt
-      case None         => 0
     }
     val to = children get "to" match {
       case Some(doc) =>
@@ -77,18 +77,25 @@ class Query(val query: Node, val col: Collection) {
           }
         }
       }
-    } drop skip take limit
+    } drop {
+      op attribute "skip" match {
+        case Some(number) => number.text.toInt
+        case None         => 0
+      }
+    } take limit toSet
   }
 
-  def apply(): List[Int] = {
-    val result = new ListBuffer[Int]
+  def eval(query: Node): Set[Int] = {
     for (op <- query.child) {
       op.label match {
-        case "eq" => eq(op)
-        case "ne" =>
-        case _    => throw new Exception(s"Unknown query operation ${op.label}")
+        case "eq"    => return qeq(op)
+        case "has"   =>
+        case "all"   => return col.all toSet
+        case "union" => return { for (littleOp <- op.child) yield eval(littleOp) }.flatten toSet
+        case "diff"  =>
+        case _       => throw new Exception(s"Unknown query operation ${op.label}")
       }
     }
-    result toList
+    return Set(0)
   }
 }

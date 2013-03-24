@@ -41,12 +41,7 @@ object Collection {
   /** "Get into" an XML document, given a path. */
   def getIn(nodes: NodeSeq, path: List[String]): List[String] = {
     if (path.size == 0) {
-      (nodes map { node =>
-        if (node.child.size > 0 && node.child(0).isInstanceOf[Elem])
-          node toString // Index XML element
-        else
-          node text // Index XML text
-      }).toList
+      nodes map { _.toString } toList
     } else {
       val ret = new ListBuffer[String]
       path match {

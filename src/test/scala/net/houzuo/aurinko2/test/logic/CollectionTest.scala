@@ -51,10 +51,10 @@ class CollectionTest extends FunSuite {
 
     // Insert to index
     (() => {
-      val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v1 = aIndex._2.get("<a>1</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v2 = aIndex._2.get("<a>2</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v3 = aIndex._2.get("<a>3</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v4 = aIndex._2.get("<a>4</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
       val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
       assert(v1 == List(docs(0)))
       assert(v2 == List(docs(0)))
@@ -66,12 +66,12 @@ class CollectionTest extends FunSuite {
     // Update indexed document
     val updated = Seq(col.update(docs(0), <root><a>5</a><a>6</a></root>))
     (() => {
-      val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v5 = aIndex._2.get("5".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v6 = aIndex._2.get("6".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v1 = aIndex._2.get("<a>1</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v2 = aIndex._2.get("<a>2</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v3 = aIndex._2.get("<a>3</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v4 = aIndex._2.get("<a>4</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v5 = aIndex._2.get("<a>5</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v6 = aIndex._2.get("<a>6</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
       val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
 
       // Old indexed value disappears
@@ -91,12 +91,12 @@ class CollectionTest extends FunSuite {
     // Delete indexed document
     col.delete(docs(1))
     (() => {
-      val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v5 = aIndex._2.get("5".hashCode(), -1, (_, _2) => true).map { _._2 }
-      val v6 = aIndex._2.get("6".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v1 = aIndex._2.get("<a>1</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v2 = aIndex._2.get("<a>2</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v3 = aIndex._2.get("<a>3</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v4 = aIndex._2.get("<a>4</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v5 = aIndex._2.get("<a>5</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+      val v6 = aIndex._2.get("<a>6</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
       val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
 
       // Existing ones not affected
@@ -148,10 +148,10 @@ class CollectionTest extends FunSuite {
     val anotherIndex = col.hashes(List("a", "b", "c"))
     assert(aIndex != null && anotherIndex != null)
 
-    val v1 = aIndex._2.get("1".hashCode(), -1, (_, _2) => true).map { _._2 }
-    val v2 = aIndex._2.get("2".hashCode(), -1, (_, _2) => true).map { _._2 }
-    val v3 = aIndex._2.get("3".hashCode(), -1, (_, _2) => true).map { _._2 }
-    val v4 = aIndex._2.get("4".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v1 = aIndex._2.get("<a>1</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v2 = aIndex._2.get("<a>2</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v3 = aIndex._2.get("<a>3</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
+    val v4 = aIndex._2.get("<a>4</a>".hashCode(), -1, (_, _2) => true).map { _._2 }
     val element = aIndex._2.get(<a><ha/></a>.toString.hashCode(), -1, (_, _2) => true).map { _._2 }
     assert(v1 == List(docs(0)))
     assert(v2 == List(docs(0)))
@@ -180,8 +180,8 @@ class CollectionTest extends FunSuite {
                    <c>c</c>
                  </b>
                </root>
-    assert(Collection.getIn(test, List("a")) == List("1", "2"))
-    assert(Collection.getIn(test, List("b", "c")) == List("c"))
+    assert(Collection.getIn(test, List("a")) == List("<a>1</a>", "<a whatever=\"a\">2</a>"))
+    assert(Collection.getIn(test, List("b", "c")) == List("<c>c</c>"))
     assert(Collection.getIn(test, List("z")) == List())
   }
 

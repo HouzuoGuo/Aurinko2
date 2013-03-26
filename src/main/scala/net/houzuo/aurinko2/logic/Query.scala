@@ -1,6 +1,7 @@
 package net.houzuo.aurinko2.logic
 
 import java.util.logging.Logger
+
 import scala.collection.mutable.HashSet
 import scala.collection.mutable.SetBuilder
 import scala.concurrent.Await
@@ -9,9 +10,10 @@ import scala.concurrent.duration.DurationInt
 import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.NodeSeq
+
 import net.houzuo.aurinko2.storage.HashGet
-import net.houzuo.aurinko2.storage.Output
 import net.houzuo.aurinko2.storage.HashGetAll
+import net.houzuo.aurinko2.storage.Output
 
 object Query {
   val LOG = Logger getLogger classOf[Query].getName
@@ -36,7 +38,7 @@ class Query(val col: Collection) {
    *   </in>
    * </eq>
    */
-  def qeq(op: Node): Set[Int] = {
+  def qeq(op: Node) = {
     val children = op.child.map { c => c.label -> c } toMap
     val path = children get "in" match {
       case Some(in) => in.child map (_.text) toList
@@ -81,7 +83,7 @@ class Query(val col: Collection) {
         case Some(number) => number.text.toInt
         case None         => 0
       }
-    } take limit toSet
+    } take limit
   }
 
   /**
@@ -94,12 +96,9 @@ class Query(val col: Collection) {
    *   </in>
    * </has>
    */
-  def qhas(op: Node): Set[Int] = {
+  def qhas(op: Node) = {
     val children = op.child.map { c => c.label -> c } toMap
-    val path = children get "in" match {
-      case Some(in) => in.child map (_.text) toList
-      case None     => throw new Exception("Please specify matching path in <in></in>")
-    }
+    val path = op.child map (_.text) toList
     val limit = op attribute "limit" match {
       case Some(number) => number.text toInt
       case None         => Int.MaxValue
@@ -126,12 +125,12 @@ class Query(val col: Collection) {
         case Some(number) => number.text.toInt
         case None         => 0
       }
-    } take limit toSet
+    } take limit
   }
 
   def eval(query: Node): Set[Int] = {
     val result = new HashSet[Int]
-    for (op <- query.child) {
+    for (op <- query.child if op.isInstanceOf[Elem]) {
       result ++= {
         op.label match {
           case "eq"  => qeq(op)
@@ -139,10 +138,12 @@ class Query(val col: Collection) {
           case _ =>
             {
               op.label match {
-                case "all"   => col.all toSet
-                case "union" => { for (littleOp <- op.child) yield eval(littleOp) }.flatten.toSet
-                case "diff"  => { for (littleOp <- op.child) yield eval(littleOp) }.reduceLeft(_ diff _)
-                case _       => throw new Exception(s"Unknown query operation '${op.label}'")
+                case "all" => col.all toSet
+                case "diff" =>
+                  { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty) reduceLeft (_ diff _)
+                case "intersect" =>
+                  { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty) reduceLeft (_ intersect _)
+                case _ => throw new Exception(s"Unknown query operation '${op.label}'")
               }
             } drop {
               op attribute "skip" match {

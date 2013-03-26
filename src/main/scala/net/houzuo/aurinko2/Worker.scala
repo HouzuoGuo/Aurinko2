@@ -7,6 +7,7 @@ import java.io.PrintWriter
 import java.net.Socket
 import java.util.logging.Logger
 
+import scala.annotation.migration
 import scala.collection.mutable.ListBuffer
 import scala.xml.Elem
 import scala.xml.NodeSeq.seqToNodeSeq
@@ -15,6 +16,7 @@ import scala.xml.XML.loadString
 import org.xml.sax.SAXParseException
 
 import net.houzuo.aurinko2.logic.Database
+import net.houzuo.aurinko2.logic.Query
 
 object Worker {
   val LOG = Logger getLogger classOf[Worker].getName()
@@ -39,7 +41,7 @@ class Worker(val db: Database, val sock: Socket) {
         val trimmed = line.trim().toLowerCase
         if ("<go/>".equals(trimmed) || "<go />".equals(trimmed) || "<go></go>".equals(trimmed))
           if (lines.size == 0)
-            respond { Some(<done/>) }
+            respond { None }
           else
             try {
               go(loadString(lines.mkString("")))
@@ -105,7 +107,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Create collection
       case "create" => respond {
-        req attribute "name" match {
+        req attribute "col" match {
           case Some(name) =>
             db create name.text; None
           case None => Some(<err>Please specify collection name in "name" attribute</err>)
@@ -127,7 +129,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Drop collection
       case "drop" => respond {
-        req attribute "name" match {
+        req attribute "col" match {
           case Some(name) =>
             db drop name.text; None
           case None => Some(<err>Please specify collection name in "name" attribute</err>)
@@ -136,7 +138,7 @@ class Worker(val db: Database, val sock: Socket) {
 
       // Repair collection
       case "repair" => respond {
-        req attribute "name" match {
+        req attribute "col" match {
           case Some(name) =>
             db repair name.text; None
           case None => Some(<err>Please specify collection name in "name" attribute</err>)
@@ -193,7 +195,7 @@ class Worker(val db: Database, val sock: Socket) {
                   case Some(number) => col.all.take(number.text.toInt)
                   case None         => col.all
                 }
-              ) yield col.read(docID) get
+              ) yield <doc>{ col.read(docID) get }</doc>
             }</collection>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
@@ -235,6 +237,28 @@ class Worker(val db: Database, val sock: Socket) {
           case Some(colName) =>
             (db get colName.text) unindex (req.child.map(_.text) toList)
             None
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
+
+      // Query and return document ID
+      case "q" => respond {
+        req attribute "col" match {
+          case Some(colName) => Some(<result>{
+            for (id <- new Query(db get colName.text).eval(req)) yield <id>{ id }</id>
+          }</result>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
+
+      // Query and return document content
+      case "select" => respond {
+        req attribute "col" match {
+          case Some(colName) =>
+            val col = db get colName.text
+            Some(<result>{
+              for (id <- new Query(col).eval(req)) yield <doc>{ col read id get }</doc>
+            }</result>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }

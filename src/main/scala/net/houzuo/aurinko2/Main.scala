@@ -26,21 +26,17 @@ object Main {
           for (
             name <- db.all;
             col = db get name
-          ) {
-            col.collection force ()
-            col.idIndex force ()
-            col.hashes foreach { _._2._2.force() }
-          }
+          ) col save
         }
       }
-    }
+    } start
 
     // Accept incoming connections
     val server = new ServerSocket(args(0) toInt)
     while (true) {
       val incoming = server accept ()
       Main.LOG info s"Client connected from ${incoming.getRemoteSocketAddress toString}"
-      new Thread { override def run() { new Worker(db, incoming) } }
+      new Thread { override def run() { new Worker(db, incoming) } } start
     }
 
     // Flush all collections and close server socket when shutdown

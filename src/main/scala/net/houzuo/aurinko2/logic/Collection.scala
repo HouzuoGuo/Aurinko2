@@ -208,7 +208,6 @@ class Collection(val path: String) {
 
   /** Insert a document, return its ID. */
   def insert(doc: Node) = {
-
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
     sync(collection offer colInsert)

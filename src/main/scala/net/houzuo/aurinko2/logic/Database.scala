@@ -8,6 +8,7 @@ import java.util.logging.Logger
 
 import scala.Array.canBuildFrom
 import scala.collection.mutable.HashMap
+import scala.math.max
 
 import net.houzuo.aurinko2.io.SimpleIO
 
@@ -16,7 +17,6 @@ object Database {
 }
 
 class Database(val path: String) {
-  private val syncher = new ReentrantLock
   private val collections = new HashMap[String, Collection]
   private val dbDir = new File(path)
 
@@ -45,121 +45,101 @@ class Database(val path: String) {
 
   /** Create a new collection. */
   def create(name: String) {
-    syncher.lock()
-    try {
-      if (collections.contains(name))
-        throw new Exception(s"Collection $name already exists")
+    if (collections.contains(name))
+      throw new Exception(s"Collection $name already exists")
 
-      val newDir = Paths.get(path, name).toString
-      if (!new File(newDir).mkdirs())
-        throw new IOException(s"Failed to create collection directory $newDir")
+    val newDir = Paths.get(path, name).toString
+    if (!new File(newDir).mkdirs())
+      throw new IOException(s"Failed to create collection directory $newDir")
 
-      collections += ((name, new Collection(newDir)))
-    } finally { syncher.unlock() }
+    collections += ((name, new Collection(newDir)))
   }
 
   /** Return reference to the opened collection. */
   def get(name: String): Collection = {
-    syncher.lock()
-    try {
-      collections get name match {
-        case Some(col) => return col
-        case None      => throw new Exception(s"Collection $name does not exist")
-      }
-    } finally { syncher.unlock() }
+    collections get name match {
+      case Some(col) => return col
+      case None      => throw new Exception(s"Collection $name does not exist")
+    }
   }
 
   /** Return all collection names. */
-  def all: Set[String] = {
-    syncher.lock()
-    try {
-      return collections.keySet.toSet
-    } finally { syncher.unlock() }
-  }
+  def all: Set[String] = collections.keySet.toSet
 
   /** Rename a collection. References to the old collection will no longer work. */
   def rename(from: String, to: String) {
-    syncher.lock()
-    try {
-      if (!collections.get(to).isEmpty)
-        throw new Exception(s"Collection name $to is already in-use")
+    if (!collections.get(to).isEmpty)
+      throw new Exception(s"Collection name $to is already in-use")
 
-      collections get from match {
-        case Some(old) =>
-          old.save()
-          val newPath = new File(Paths.get(path, to) toString)
-          if (!newPath.mkdirs())
-            throw new IOException(s"Failed to rename ${old.path} to ${newPath getAbsolutePath}")
-          if (!new File(old.path).renameTo(newPath))
-            throw new IOException(s"Failed to rename ${old.path} to ${newPath getAbsolutePath}")
+    collections get from match {
+      case Some(old) =>
+        old.save()
+        val newPath = new File(Paths.get(path, to) toString)
+        if (!newPath.mkdirs())
+          throw new IOException(s"Failed to rename ${old.path} to ${newPath getAbsolutePath}")
+        if (!new File(old.path).renameTo(newPath))
+          throw new IOException(s"Failed to rename ${old.path} to ${newPath getAbsolutePath}")
 
-          collections -= from
-          collections += ((to, new Collection(newPath getAbsolutePath)))
-        case None => throw new Exception(s"Collection $from does not exist")
-      }
-    } finally { syncher.unlock() }
+        collections -= from
+        collections += ((to, new Collection(newPath getAbsolutePath)))
+      case None => throw new Exception(s"Collection $from does not exist")
+    }
   }
 
   /** Drop (delete) a collection. */
   def drop(name: String) {
-    syncher.lock()
-    try {
-      collections get name match {
-        case Some(old) =>
-          SimpleIO.rmrf(new File(old.path))
-          collections -= name
-        case None => throw new Exception(s"Collection $name does not exist")
-      }
-    } finally { syncher.unlock() }
+    collections get name match {
+      case Some(old) =>
+        SimpleIO.rmrf(new File(old.path))
+        collections -= name
+      case None => throw new Exception(s"Collection $name does not exist")
+    }
   }
 
   /** Repair a collection. */
   def repair(name: String) {
-    syncher.lock()
-    try {
-      val toRepair = get(name)
-      val originalIndexes = toRepair.hashes
-      val tmp = "repair" + System.nanoTime().toString
-      create(tmp)
-      val tmpCol = get(tmp)
+    val toRepair = get(name)
+    val originalIndexes = toRepair.hashes
+    val tmp = "repair" + System.nanoTime().toString
+    create(tmp)
+    val tmpCol = get(tmp)
 
-      // Copy documents from source to temporary collection
-      def copyDocs(ids: Seq[Int]) {
-        ids foreach { id =>
-          toRepair read id match {
-            case Some(doc) => tmpCol insert doc
-            case None      =>
-          }
+    // Copy documents from source to temporary collection
+    def copyDocs(ids: Seq[Int]) {
+      ids foreach { id =>
+        toRepair read id match {
+          case Some(doc) => tmpCol insert doc
+          case None      =>
         }
       }
+    }
 
-      // Get all document IDs
-      val ids = toRepair.all().toArray
-      if (ids.size > 0) {
-        val perThread = ids.size / Runtime.getRuntime().availableProcessors() * 2
-        if (perThread < 10)
-          copyDocs(ids)
-        else {
+    // Get all document IDs
+    val ids = toRepair.all().toArray
+    if (ids.size > 0) {
+      val perThread = ids.size / max(Runtime.getRuntime.availableProcessors * 2, 4)
+      if (perThread < 10)
+        copyDocs(ids)
+      else {
 
-          // Using multiple threads to copy documents across
-          val inserts = for (i <- Array.range(0, ids.size, perThread)) yield new Thread {
-            override def run() {
-              copyDocs(ids.slice(i, i + perThread))
-            }
+        // Using multiple threads to copy documents across
+        val inserts = for (i <- Array.range(0, ids.size, perThread)) yield new Thread {
+          override def run() {
+            copyDocs(ids.slice(i, i + perThread))
           }
-          inserts foreach { _.start() }
-          inserts foreach { _.join() }
         }
+        inserts foreach { _.start() }
+        inserts foreach { _.join() }
       }
+    }
 
-      // Add indexes back
-      for (indexedPath <- originalIndexes)
-        tmpCol.index(indexedPath._1, indexedPath._2._2.hashBits, indexedPath._2._2.bucketSize)
+    // Add indexes back
+    for (indexedPath <- originalIndexes)
+      tmpCol.index(indexedPath._1, indexedPath._2._2.hashBits, indexedPath._2._2.bucketSize)
 
-      // Start using the repaired collection
-      drop(name)
-      rename(tmp, name)
-    } finally { syncher.unlock() }
+    // Start using the repaired collection
+    drop(name)
+    rename(tmp, name)
   }
 
   /** Flush all data files. */

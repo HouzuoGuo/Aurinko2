@@ -83,7 +83,9 @@ class Worker(val db: Database, val sock: Socket) {
         case None        =>
       }
     } catch {
-      case e: Exception => out println <err>{ e getMessage }</err>
+      case e: Exception =>
+        out println <err>{ e getMessage }</err>
+        e printStackTrace
     } finally {
       out println <done/>
     }
@@ -150,7 +152,7 @@ class Worker(val db: Database, val sock: Socket) {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
-            Some(<inserted>{ for (doc <- req.child) yield <id>{ col insert doc.asInstanceOf[Elem] }</id> }</inserted>)
+            Some(<inserted>{ col insert req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem] }</inserted>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
@@ -164,7 +166,7 @@ class Worker(val db: Database, val sock: Socket) {
               for (update <- req.child)
                 yield update.attribute("id") match {
                 case Some(oldID) =>
-                  <id old={ oldID }>{ col.update(oldID.text.toInt, update.child(0).asInstanceOf[Elem]) get }</id>
+                  <id old={ oldID }>{ col.update(oldID.text.toInt, update.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem]) get }</id>
                 case None => throw new Exception("Please specify ID of all documents to update")
               }
             }</updated>)
@@ -262,6 +264,8 @@ class Worker(val db: Database, val sock: Socket) {
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
+
+      case "shutdown" => System exit 0
     }
   }
 }

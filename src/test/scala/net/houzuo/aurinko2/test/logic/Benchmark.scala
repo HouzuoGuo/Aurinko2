@@ -18,7 +18,7 @@ class Benchmark extends FunSuite {
    * This benchmark spawns multiple threads to simulate concurrent read and write operations.
    */
   test("collection storage layer performance benchmark") {
-    val parallelLevel = Runtime.getRuntime().availableProcessors() * 2
+    val numThreads = max(Runtime.getRuntime.availableProcessors * 2, 4) // At least 4 threads
     val iterations = 200000
     val positions = new ArrayBuffer[Int](iterations)
     val col = collection
@@ -26,9 +26,9 @@ class Benchmark extends FunSuite {
     col.index(List("d", "e", "f"), 14, 200)
 
     println("Insert 200k documents with 2 indexes")
-    val inserts = for (i <- 1 to parallelLevel) yield new Thread {
+    val inserts = for (i <- 1 to numThreads) yield new Thread {
       override def run() {
-        for (j <- 1 to iterations / parallelLevel) {
+        for (j <- 1 to iterations / numThreads) {
           val position = col.insert(
             <root>
               <a><b><c>{ random.nextInt(20000) }</c></b></a>
@@ -52,9 +52,9 @@ The resources may be accessed from tests by using the getResource methods of jav
     }
 
     println("Read 200k documents")
-    val reads = for (i <- 1 to parallelLevel) yield new Thread {
+    val reads = for (i <- 1 to numThreads) yield new Thread {
       override def run() {
-        for (j <- 1 to iterations / parallelLevel)
+        for (j <- 1 to iterations / numThreads)
           col.read(positions(random.nextInt(iterations)))
       }
     }
@@ -64,9 +64,9 @@ The resources may be accessed from tests by using the getResource methods of jav
     }
 
     println("Update 200k documents")
-    val updates = for (i <- 1 to parallelLevel) yield new Thread {
+    val updates = for (i <- 1 to numThreads) yield new Thread {
       override def run() {
-        for (j <- 1 to iterations / parallelLevel)
+        for (j <- 1 to iterations / numThreads)
           col.update(positions(random.nextInt(iterations)),
             <root>
               <a><b><c>{ random.nextInt(20000) }</c></b></a>
@@ -87,9 +87,9 @@ The resources may be accessed from tests by using the getResource methods of jav
     }
 
     println("Delete 200k documents")
-    val deletes = for (i <- 1 to parallelLevel) yield new Thread {
+    val deletes = for (i <- 1 to numThreads) yield new Thread {
       override def run() {
-        for (j <- 1 to iterations / parallelLevel)
+        for (j <- 1 to iterations / numThreads)
           col.delete(positions(random.nextInt(iterations)))
       }
     }

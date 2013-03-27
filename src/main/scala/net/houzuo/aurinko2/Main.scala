@@ -50,7 +50,7 @@ object Main {
     } start
 
     // Run benchmark if asked
-    if ("benchmark" equals args(2))
+    if (args.length == 3 && "benchmark".equals(args(2)))
       Benchmark(args(0) toInt)
   }
 }

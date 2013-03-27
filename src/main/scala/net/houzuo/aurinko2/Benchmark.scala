@@ -244,9 +244,9 @@ object Benchmark {
             }
           }.toList
 
-          TimedExecution.average(s"Delete ${iterations * 2} (estimated) documents", iterations * 2) {
-            deletes foreach { _.start() }
-            deletes foreach { _.join() }
+          TimedExecution.average(s"${iterations * 2} queries", iterations * 2) {
+            queries foreach { _.start() }
+            queries foreach { _.join() }
           }
         }
       }

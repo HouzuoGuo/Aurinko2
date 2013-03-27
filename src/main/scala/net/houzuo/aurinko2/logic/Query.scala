@@ -140,9 +140,17 @@ class Query(val col: Collection) {
               op.label match {
                 case "all" => col.all toSet
                 case "diff" =>
-                  { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty) reduceLeft (_ diff _)
+                  val result = { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty)
+                  if (result.isEmpty)
+                    Set[Int]()
+                  else
+                    result reduceLeft (_ diff _)
                 case "intersect" =>
-                  { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty) reduceLeft (_ intersect _)
+                  val result = { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty)
+                  if (result.isEmpty)
+                    Set[Int]()
+                  else
+                    result reduceLeft (_ diff _)
                 case _ => throw new Exception(s"Unknown query operation '${op.label}'")
               }
             } drop {

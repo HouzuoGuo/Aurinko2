@@ -7,7 +7,6 @@ import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.logging.Logger
-
 import scala.Array.canBuildFrom
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
@@ -20,7 +19,6 @@ import scala.xml.NodeSeq
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
 import scala.xml.XML.loadString
-
 import net.houzuo.aurinko2.io.SimpleIO.spit
 import net.houzuo.aurinko2.storage.{ Collection => CollFile }
 import net.houzuo.aurinko2.storage.CollectionDelete
@@ -33,6 +31,8 @@ import net.houzuo.aurinko2.storage.HashPut
 import net.houzuo.aurinko2.storage.HashRemove
 import net.houzuo.aurinko2.storage.HashSync
 import net.houzuo.aurinko2.storage.Output
+import scala.xml.parsing.ConstructingParser
+import scala.io.Source
 
 object Collection {
   val IO_TIMEOUT = 120000 // IO waiting timeout in milliseconds
@@ -46,7 +46,7 @@ object Collection {
       val ret = new ListBuffer[String]
       path match {
         case first :: rest => nodes foreach { node => ret ++= getIn(node \ first, rest) }
-        case Nil           =>
+        case Nil =>
       }
       ret.toList
     }
@@ -98,11 +98,11 @@ class Collection(val path: String) {
             new Hash(new RandomAccessFile(Paths.get(path, filename text) toString, "rw") getChannel,
               hash attribute "bits" match {
                 case Some(bits) => bits.text toInt
-                case None       => throw new Exception(s"Index $filename has hash number of bits undefined")
+                case None => throw new Exception(s"Index $filename has hash number of bits undefined")
               },
               hash attribute "per_bucket" match {
                 case Some(entries) => entries.text toInt
-                case None          => throw new Exception(s"Index $filename has index entries per bucket undefined")
+                case None => throw new Exception(s"Index $filename has index entries per bucket undefined")
               })))
       case None =>
         Collection.LOG severe "An index exists in configuration file but without a file name. It is skipped."
@@ -184,7 +184,7 @@ class Collection(val path: String) {
     if (work.data.data == null)
       return None
     try {
-      return Some(loadString(new String(work.data.data)))
+      return Some(ConstructingParser.fromSource(Source.fromString(new String(work.data.data)), false).document.docElem.asInstanceOf[Elem])
     } catch {
       case e: Exception =>
         Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(work.data.data)}")

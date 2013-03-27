@@ -14,7 +14,6 @@ import scala.concurrent.Await
 import scala.concurrent.Promise
 import scala.concurrent.duration.DurationInt
 import scala.math.min
-import scala.xml.Elem
 import scala.xml.NodeSeq
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
@@ -32,6 +31,8 @@ import net.houzuo.aurinko2.storage.HashSync
 import net.houzuo.aurinko2.storage.Output
 import scala.xml.parsing.ConstructingParser
 import scala.io.Source
+import scala.xml.Elem
+import scala.xml.Node
 
 object Collection {
   val IO_TIMEOUT = 120000 // IO waiting timeout in milliseconds
@@ -177,13 +178,13 @@ class Collection(val path: String) {
   }
 
   /** Read a document given document ID, return the read document, or <code>null</code> if the ID is invalid. */
-  def read(id: Int): Option[Elem] = {
+  def read(id: Int): Option[Node] = {
     val work = CollectionRead(id, new Output[Array[Byte]](null))
     sync(collection offer work)
     if (work.data.data == null)
       return None
     try {
-      return Some(ConstructingParser.fromSource(Source.fromString(new String(work.data.data)), false).document.docElem.asInstanceOf[Elem])
+      return Some(ConstructingParser.fromSource(Source.fromString(new String(work.data.data)), false).document.docElem)
     } catch {
       case e: Exception =>
         Collection.LOG.warning(s"Document cannot be parsed as XML: ${new String(work.data.data)}")
@@ -192,21 +193,21 @@ class Collection(val path: String) {
   }
 
   /** Put a document into all indexes. */
-  def indexDoc(doc: Elem, id: Int) =
+  def indexDoc(doc: Node, id: Int) =
     for (
       index <- hashes;
       toIndex <- Collection.getIn(doc, index._1)
     ) yield index._2._2 offer HashPut(toIndex hashCode, id)
 
   /** Remove a document from all indexes. */
-  def unindexDoc(doc: Elem, id: Int) =
+  def unindexDoc(doc: Node, id: Int) =
     for (
       index <- hashes;
       toIndex <- Collection.getIn(doc, index._1)
     ) yield index._2._2 offer HashRemove(toIndex hashCode, 1, (_, value) => value == id)
 
   /** Insert a document, return its ID. */
-  def insert(doc: Elem) = {
+  def insert(doc: Node) = {
 
     // Insert document to collection
     val colInsert = CollectionInsert(doc.toString.getBytes, new Output[Int](0))
@@ -223,7 +224,7 @@ class Collection(val path: String) {
   }
 
   /** Update a document given its ID and new document element, return updated document's ID. */
-  def update(id: Int, doc: Elem) = {
+  def update(id: Int, doc: Node) = {
     read(id) match {
       case Some(oldDoc) =>
 

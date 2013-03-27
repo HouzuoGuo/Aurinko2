@@ -10,9 +10,9 @@ object Main {
   val FLUSH_INTERVAL = 60000 // Data file flush interval in milliseconds
 
   def main(args: Array[String]): Unit = {
-    if (args.length != 2) {
+    if (args.length != 2 && args.length != 3) {
       println(args mkString ("|"))
-      System.err println "sbt run PORT DB_DIR";
+      System.err println "sbt run PORT DB_DIR [benchmark]";
       System exit (1)
     }
 
@@ -31,20 +31,26 @@ object Main {
       }
     } start
 
-    // Accept incoming connections
-    val server = new ServerSocket(args(0) toInt)
-    while (true) {
-      val incoming = server accept ()
-      Main.LOG info s"Client connected from ${incoming.getRemoteSocketAddress toString}"
-      new Thread { override def run() { new Worker(db, incoming) } } start
+    // Flush all collections on shutdown
+    Runtime.getRuntime addShutdownHook new Thread {
+      override def run() { db close }
     }
 
-    // Flush all collections and close server socket when shutdown
-    Runtime.getRuntime() addShutdownHook new Thread {
+    val server = new ServerSocket(args(0) toInt)
+
+    // Accept incoming connections
+    new Thread {
       override def run() {
-        db.close()
-        server.close()
+        while (true) {
+          val incoming = server.accept
+          Main.LOG info s"Client connected from ${incoming.getRemoteSocketAddress toString}"
+          new Thread { override def run() { new Worker(db, incoming) } } start
+        }
       }
-    }
+    } start
+
+    // Run benchmark if asked
+    if ("benchmark" equals args(2))
+      Benchmark(args(0) toInt)
   }
 }

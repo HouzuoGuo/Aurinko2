@@ -163,10 +163,10 @@ class Worker(val db: Database, val sock: Socket) {
           case Some(colName) =>
             val col = db get colName.text
             Some(<updated>{
-              for (update <- req.child)
-                yield update.attribute("id") match {
+              req.attribute("id") match {
                 case Some(oldID) =>
-                  <id old={ oldID }>{ col.update(oldID.text.toInt, update.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem]) get }</id>
+                  <old>{ oldID text }</old>
+                  <new>{ col.update(oldID.text toInt, req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem]) get }</new>
                 case None => throw new Exception("Please specify ID of all documents to update")
               }
             }</updated>)
@@ -178,9 +178,10 @@ class Worker(val db: Database, val sock: Socket) {
       case "delete" => respond {
         req attribute "col" match {
           case Some(colName) =>
-            val col = db get colName.text
-            for (toDelete <- req.child)
-              col delete toDelete.text.toInt
+            req attribute "id" match {
+              case Some(id) => db.get(colName text).delete(id.text toInt)
+              case None     => throw new Exception("Please specify document ID to delete")
+            }
             None
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }

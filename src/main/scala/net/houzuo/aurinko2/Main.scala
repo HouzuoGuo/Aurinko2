@@ -51,6 +51,6 @@ object Main {
 
     // Run benchmark if asked
     if (args.length == 3 && "benchmark".equals(args(2)))
-      Benchmark(args(0) toInt)
+      Benchmark(db, args(0) toInt)
   }
 }

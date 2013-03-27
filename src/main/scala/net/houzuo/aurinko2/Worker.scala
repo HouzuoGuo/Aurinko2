@@ -6,17 +6,17 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.logging.Logger
-
 import scala.annotation.migration
 import scala.collection.mutable.ListBuffer
 import scala.xml.Elem
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML.loadString
-
 import org.xml.sax.SAXParseException
-
 import net.houzuo.aurinko2.logic.Database
 import net.houzuo.aurinko2.logic.Query
+import scala.xml.parsing.ConstructingParser
+import scala.io.Source
+import scala.xml.Node
 
 object Worker {
   val LOG = Logger getLogger classOf[Worker].getName()
@@ -44,7 +44,7 @@ class Worker(val db: Database, val sock: Socket) {
             respond { None }
           else
             try {
-              go(loadString(lines.mkString("")))
+              go(ConstructingParser.fromSource(Source.fromString(lines mkString "\n"), true).document.docElem)
             } catch {
               case e: SAXParseException => out println <err>Unable to parse request as XML document</err>
               case e: Exception =>
@@ -90,7 +90,7 @@ class Worker(val db: Database, val sock: Socket) {
   }
 
   /** Process request. */
-  private def go(req: Elem) {
+  private def go(req: Node) {
     req.label.toLowerCase match {
 
       // Get all collection names

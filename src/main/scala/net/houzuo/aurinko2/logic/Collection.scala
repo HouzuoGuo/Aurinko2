@@ -18,7 +18,6 @@ import scala.xml.Elem
 import scala.xml.NodeSeq
 import scala.xml.NodeSeq.seqToNodeSeq
 import scala.xml.XML
-import scala.xml.XML.loadString
 import net.houzuo.aurinko2.io.SimpleIO.spit
 import net.houzuo.aurinko2.storage.{ Collection => CollFile }
 import net.houzuo.aurinko2.storage.CollectionDelete
@@ -46,7 +45,7 @@ object Collection {
       val ret = new ListBuffer[String]
       path match {
         case first :: rest => nodes foreach { node => ret ++= getIn(node \ first, rest) }
-        case Nil =>
+        case Nil           =>
       }
       ret.toList
     }
@@ -98,11 +97,11 @@ class Collection(val path: String) {
             new Hash(new RandomAccessFile(Paths.get(path, filename text) toString, "rw") getChannel,
               hash attribute "bits" match {
                 case Some(bits) => bits.text toInt
-                case None => throw new Exception(s"Index $filename has hash number of bits undefined")
+                case None       => throw new Exception(s"Index $filename has hash number of bits undefined")
               },
               hash attribute "per_bucket" match {
                 case Some(entries) => entries.text toInt
-                case None => throw new Exception(s"Index $filename has index entries per bucket undefined")
+                case None          => throw new Exception(s"Index $filename has index entries per bucket undefined")
               })))
       case None =>
         Collection.LOG severe "An index exists in configuration file but without a file name. It is skipped."

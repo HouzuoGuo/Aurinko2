@@ -43,7 +43,7 @@ object Main {
       override def run() {
         while (true) {
           val incoming = server.accept
-          Main.LOG info s"Client connected from ${incoming.getRemoteSocketAddress toString}"
+          Main.LOG fine s"Client connected from ${incoming.getRemoteSocketAddress toString}"
           new Thread { override def run() { new Worker(db, incoming) } } start
         }
       }

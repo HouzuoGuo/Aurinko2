@@ -62,7 +62,7 @@ class Worker(val db: Database, val sock: Socket) {
         }
       }
   } catch {
-    case e: IOException => Worker.LOG warning s"${sock.getRemoteSocketAddress toString} disconnected"
+    case e: IOException => Worker.LOG fine s"${sock.getRemoteSocketAddress toString} disconnected"
   } finally {
     try {
       in.close()

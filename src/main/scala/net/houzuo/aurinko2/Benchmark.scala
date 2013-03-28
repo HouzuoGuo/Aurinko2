@@ -7,6 +7,7 @@ import java.net.Socket
 
 import scala.util.Random
 import scala.xml.Node
+import scala.math.min
 
 import net.houzuo.aurinko2.logic.Database
 
@@ -40,6 +41,9 @@ object Benchmark {
     }
   }
   def apply(db: Database, port: Int) {
+    println("Please be patient, benchmark may take several minutes!")
+    println("Wait 20 seconds for things to cool down...")
+    Thread sleep 20000
     val single_sock = new Socket("localhost", port)
     val single_in = new BufferedReader(new InputStreamReader(single_sock getInputStream))
     val single_out = new PrintWriter(single_sock getOutputStream, true)
@@ -60,10 +64,10 @@ object Benchmark {
       command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>j1</path><path>j2</path></hash-index>)
       command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>k1</path><path>k2</path></hash-index>)
 
-      val iterations = 100000
-      val numThreads = Runtime.getRuntime.availableProcessors * 25 // Good to have many IO connections
+      val iterations = 200000
+      val numThreads = min(Runtime.getRuntime.availableProcessors * 100, 800) // Good to have many IO connections
 
-      // Insert 200k documents (total) into two collections 
+      // Insert 400k documents (total) into two collections 
       {
         val inserts = {
           for (i <- 1 to numThreads) yield new Thread {
@@ -111,7 +115,7 @@ object Benchmark {
         }
       }
 
-      // Update 200k documents (total) in two collections
+      // Update 400k documents (total) in two collections
       {
         val docs1 = db.get("__benchmark1").all toArray
         val docs2 = db.get("__benchmark2").all toArray
@@ -161,7 +165,7 @@ object Benchmark {
         }
       }
 
-      // Delete 200k documents (estimated, total) in two collections
+      // Delete 400k documents (estimated, total) in two collections
       {
         val docs1 = db.get("__benchmark1").all toArray
         val docs2 = db.get("__benchmark2").all toArray
@@ -198,7 +202,7 @@ object Benchmark {
           deletes foreach { _.join() }
         }
 
-        // 200k queries (3 lookups each) in two collections
+        // 400k queries (3 lookups each) in two collections
         {
           val queries = {
             for (i <- 1 to numThreads) yield new Thread {

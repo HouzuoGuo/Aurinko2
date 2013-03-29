@@ -24,7 +24,7 @@ class Benchmark extends FunSuite {
     col.index(List("j1", "j2"), 14, 200)
     col.index(List("k1", "k2"), 14, 200)
 
-    println("Insert 200k documents with 2 indexes")
+    println("Insert 200k documents")
     val inserts = for (i <- 1 to numThreads) yield new Thread {
       override def run() {
         for (j <- 1 to iterations / numThreads)

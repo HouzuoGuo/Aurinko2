@@ -157,6 +157,22 @@ class Worker(val db: Database, val sock: Socket) {
         }
       }
 
+      // Retrieve document by ID
+      case "get" => respond {
+        req attribute "col" match {
+          case Some(colName) =>
+            Some(<doc>{
+              db get colName.text read {
+                req attribute "id" match {
+                  case Some(id) => id.text toInt
+                  case None     => throw new Exception("Please specify ID of document to retrie")
+                }
+              }
+            }</doc>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
+
       // Update documents
       case "update" => respond {
         req attribute "col" match {
@@ -167,7 +183,7 @@ class Worker(val db: Database, val sock: Socket) {
                 case Some(oldID) =>
                   <old>{ oldID text }</old>
                   <new>{ col.update(oldID.text toInt, req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem]) get }</new>
-                case None => throw new Exception("Please specify ID of all documents to update")
+                case None => throw new Exception("Please specify ID of document to update")
               }
             }</updated>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
@@ -260,13 +276,15 @@ class Worker(val db: Database, val sock: Socket) {
           case Some(colName) =>
             val col = db get colName.text
             Some(<result>{
-              for (id <- new Query(col).eval(req)) yield <doc>{ col read id get }</doc>
+              for (id <- new Query(col).eval(req)) yield <doc id={ id toString }>{ col read id get }</doc>
             }</result>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
       case "shutdown" => System exit 0
+
+      case _          => Some(<err>Unknown command</err>)
     }
   }
 }

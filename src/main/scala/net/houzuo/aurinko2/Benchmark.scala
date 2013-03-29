@@ -78,9 +78,9 @@ object Benchmark {
               for (j <- 1 to iterations / numThreads)
                 command(in, out, <insert col="__benchmark1">
                                    <root>
-                                     <i1><i2>{ random.nextInt(iterations) }</i2></i1>
-                                     <j1><j2>{ random.nextInt(iterations) }</j2></j1>
-                                     <k1><k2>{ random.nextInt(iterations) }</k2></k1>
+                                     <i1><i2>{ random nextInt iterations }</i2></i1>
+                                     <j1><j2>{ random nextInt iterations }</j2></j1>
+                                     <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
                                  </insert>)
               in.close()
@@ -97,9 +97,9 @@ object Benchmark {
               for (j <- 1 to iterations / numThreads)
                 command(in, out, <insert col="__benchmark2">
                                    <root>
-                                     <i1><i2>{ random.nextInt(iterations) }</i2></i1>
-                                     <j1><j2>{ random.nextInt(iterations) }</j2></j1>
-                                     <k1><k2>{ random.nextInt(iterations) }</k2></k1>
+                                     <i1><i2>{ random nextInt iterations }</i2></i1>
+                                     <j1><j2>{ random nextInt iterations }</j2></j1>
+                                     <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
                                  </insert>)
               in.close()
@@ -110,8 +110,8 @@ object Benchmark {
         }.toList
 
         TimedExecution.average(s"Insert ${iterations * 2} documents", iterations * 2) {
-          inserts foreach { _.start() }
-          inserts foreach { _.join() }
+          inserts foreach { _ start }
+          inserts foreach { _ join }
         }
       }
 
@@ -126,11 +126,11 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <update col="__benchmark1" id={ docs1(random.nextInt(iterations)) toString }>
+                command(in, out, <update col="__benchmark1" id={ docs1(random nextInt iterations) toString }>
                                    <root>
-                                     <i1><i2>{ random.nextInt(iterations) }</i2></i1>
-                                     <j1><j2>{ random.nextInt(iterations) }</j2></j1>
-                                     <k1><k2>{ random.nextInt(iterations) }</k2></k1>
+                                     <i1><i2>{ random nextInt iterations }</i2></i1>
+                                     <j1><j2>{ random nextInt iterations }</j2></j1>
+                                     <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
                                  </update>)
               in.close()
@@ -145,11 +145,11 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <update col="__benchmark2" id={ docs2(random.nextInt(iterations)) toString }>
+                command(in, out, <update col="__benchmark2" id={ docs2(random nextInt iterations) toString }>
                                    <root>
-                                     <i1><i2>{ random.nextInt(iterations) }</i2></i1>
-                                     <j1><j2>{ random.nextInt(iterations) }</j2></j1>
-                                     <k1><k2>{ random.nextInt(iterations) }</k2></k1>
+                                     <i1><i2>{ random nextInt iterations }</i2></i1>
+                                     <j1><j2>{ random nextInt iterations }</j2></j1>
+                                     <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
                                  </update>)
               in.close()
@@ -160,8 +160,8 @@ object Benchmark {
         }.toList
 
         TimedExecution.average(s"Update ${iterations * 2} documents", iterations * 2) {
-          updates foreach { _.start() }
-          updates foreach { _.join() }
+          updates foreach { _ start }
+          updates foreach { _ join }
         }
       }
 
@@ -176,7 +176,7 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <delete col="__benchmark1" id={ docs1(random.nextInt(iterations)) toString }/>)
+                command(in, out, <delete col="__benchmark1" id={ docs1(random nextInt iterations) toString }/>)
               in.close()
               out.close()
               sock.close()
@@ -189,7 +189,7 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <delete col="__benchmark2" id={ docs2(random.nextInt(iterations)) toString }/>)
+                command(in, out, <delete col="__benchmark2" id={ docs2(random nextInt iterations) toString }/>)
               in.close()
               out.close()
               sock.close()
@@ -198,8 +198,8 @@ object Benchmark {
         }.toList
 
         TimedExecution.average(s"Delete ${iterations * 2} documents", iterations * 2) {
-          deletes foreach { _.start() }
-          deletes foreach { _.join() }
+          deletes foreach { _ start }
+          deletes foreach { _ join }
         }
 
         // 400k queries (3 lookups each) in two collections
@@ -214,10 +214,10 @@ object Benchmark {
                   command(in, out, <q col="__benchmark1">
                                      <diff>
                                        <intersect>
-                                         <eq limit={ random.nextInt(100) toString }><to><i2>{ random.nextInt(iterations) }</i2></to><in><path>i1</path><path>i2</path></in></eq>
-                                         <eq limit={ random.nextInt(100) toString }><to><j2>{ random.nextInt(iterations) }</j2></to><in><path>j1</path><path>j2</path></in></eq>
+                                         <eq limit={ random nextInt 100 toString }><to><i2>{ random nextInt iterations }</i2></to><in><path>i1</path><path>i2</path></in></eq>
+                                         <eq limit={ random nextInt 100 toString }><to><j2>{ random nextInt iterations }</j2></to><in><path>j1</path><path>j2</path></in></eq>
                                        </intersect>
-                                       <eq limit={ random.nextInt(100) toString }><to><k2>{ random.nextInt(iterations) }</k2></to><in><path>k1</path><path>k2</path></in></eq>
+                                       <eq limit={ random nextInt 100 toString }><to><k2>{ random nextInt iterations }</k2></to><in><path>k1</path><path>k2</path></in></eq>
                                      </diff>
                                    </q>)
                 in.close()
@@ -235,10 +235,10 @@ object Benchmark {
                   command(in, out, <q col="__benchmark2">
                                      <diff>
                                        <intersect>
-                                         <eq limit={ random.nextInt(100) toString }><to><i2>{ random.nextInt(iterations) }</i2></to><in><path>i1</path><path>i2</path></in></eq>
-                                         <eq limit={ random.nextInt(100) toString }><to><j2>{ random.nextInt(iterations) }</j2></to><in><path>j1</path><path>j2</path></in></eq>
+                                         <eq limit={ random nextInt 100 toString }><to><i2>{ random nextInt iterations }</i2></to><in><path>i1</path><path>i2</path></in></eq>
+                                         <eq limit={ random nextInt 100 toString }><to><j2>{ random nextInt iterations }</j2></to><in><path>j1</path><path>j2</path></in></eq>
                                        </intersect>
-                                       <eq limit={ random.nextInt(100) toString }><to><k2>{ random.nextInt(iterations) }</k2></to><in><path>k1</path><path>k2</path></in></eq>
+                                       <eq limit={ random nextInt 100 toString }><to><k2>{ random nextInt iterations }</k2></to><in><path>k1</path><path>k2</path></in></eq>
                                      </diff>
                                    </q>)
                 in.close()
@@ -249,8 +249,8 @@ object Benchmark {
           }.toList
 
           TimedExecution.average(s"${iterations * 2} queries", iterations * 2) {
-            queries foreach { _.start() }
-            queries foreach { _.join() }
+            queries foreach { _ start }
+            queries foreach { _ join }
           }
         }
       }

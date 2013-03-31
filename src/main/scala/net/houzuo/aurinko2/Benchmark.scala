@@ -5,11 +5,15 @@ import java.io.InputStreamReader
 import java.io.PrintWriter
 import java.net.Socket
 
+import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
+import scala.math.min
 import scala.util.Random
 import scala.xml.Node
-import scala.math.min
 
 import net.houzuo.aurinko2.logic.Database
+import net.houzuo.aurinko2.storage.CollectionSync
+import net.houzuo.aurinko2.storage.HashSync
 
 object TimedExecution {
 
@@ -29,18 +33,29 @@ object Benchmark {
   private val random = new Random()
 
   /** Send an Aurinko2 command through the socket, expect but discard any server response. */
-  def command(in: BufferedReader, out: PrintWriter, cmd: Node) {
+  def command(in: BufferedReader, out: PrintWriter, cmd: Node, wait: Boolean = false) {
     out.println(cmd)
     out.println(<go/>)
-    while (true) {
-      val response = in.readLine
-      if (response == null)
-        return
-      if ("<done/>".equals(response))
-        return
-    }
+    if (wait)
+      while (true) {
+        val response = in.readLine
+        if (response == null)
+          return
+        if ("<ok/>".equals(response))
+          return
+      }
   }
+
   def apply(db: Database, port: Int) {
+
+    // Synchronise benchmark collection IO
+    def sync {
+      Await.result(db.get("__benchmark1").collection offer CollectionSync(() => {}) future, Int.MaxValue millisecond)
+      Await.result(db.get("__benchmark1").idIndex offer HashSync(() => {}) future, Int.MaxValue millisecond)
+      Await.result(db.get("__benchmark2").collection offer CollectionSync(() => {}) future, Int.MaxValue millisecond)
+      Await.result(db.get("__benchmark2").idIndex offer HashSync(() => {}) future, Int.MaxValue millisecond)
+    }
+
     println("Please be patient, benchmark may take several minutes!")
     println("Wait 20 seconds for things to cool down...")
     Thread sleep 20000
@@ -51,21 +66,21 @@ object Benchmark {
     try {
       // Prepare benchmark collections
       // 2 collections
-      command(single_in, single_out, <drop col="__benchmark1"/>)
-      command(single_in, single_out, <drop col="__benchmark2"/>)
-      command(single_in, single_out, <create col="__benchmark1"/>)
-      command(single_in, single_out, <create col="__benchmark2"/>)
+      command(single_in, single_out, <drop col="__benchmark1"/>, true)
+      command(single_in, single_out, <drop col="__benchmark2"/>, true)
+      command(single_in, single_out, <create col="__benchmark1"/>, true)
+      command(single_in, single_out, <create col="__benchmark2"/>, true)
 
       // 3 indexes each
-      command(single_in, single_out, <hash-index col="__benchmark1" hash-bits="14" bucket-size="200"><path>i1</path><path>i2</path></hash-index>)
-      command(single_in, single_out, <hash-index col="__benchmark1" hash-bits="14" bucket-size="200"><path>j1</path><path>j2</path></hash-index>)
-      command(single_in, single_out, <hash-index col="__benchmark1" hash-bits="14" bucket-size="200"><path>k1</path><path>k2</path></hash-index>)
-      command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>i1</path><path>i2</path></hash-index>)
-      command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>j1</path><path>j2</path></hash-index>)
-      command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>k1</path><path>k2</path></hash-index>)
+      command(single_in, single_out, <hash-index col="__benchmark1" hash-bits="14" bucket-size="200"><path>i1</path><path>i2</path></hash-index>, true)
+      command(single_in, single_out, <hash-index col="__benchmark1" hash-bits="14" bucket-size="200"><path>j1</path><path>j2</path></hash-index>, true)
+      command(single_in, single_out, <hash-index col="__benchmark1" hash-bits="14" bucket-size="200"><path>k1</path><path>k2</path></hash-index>, true)
+      command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>i1</path><path>i2</path></hash-index>, true)
+      command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>j1</path><path>j2</path></hash-index>, true)
+      command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>k1</path><path>k2</path></hash-index>, true)
 
       val iterations = 200000
-      val numThreads = min(Runtime.getRuntime.availableProcessors * 100, 800) // Good to have many IO connections
+      val numThreads = min(Runtime.getRuntime.availableProcessors * 50, 400) // Good to have many IO connections
 
       // Insert 400k documents (total) into two collections 
       {
@@ -76,13 +91,13 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <insert col="__benchmark1">
+                command(in, out, <in col="__benchmark1">
                                    <root>
                                      <i1><i2>{ random nextInt iterations }</i2></i1>
                                      <j1><j2>{ random nextInt iterations }</j2></j1>
                                      <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
-                                 </insert>)
+                                 </in>)
               in.close()
               out.close()
               sock.close()
@@ -95,13 +110,13 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <insert col="__benchmark2">
+                command(in, out, <in col="__benchmark2">
                                    <root>
                                      <i1><i2>{ random nextInt iterations }</i2></i1>
                                      <j1><j2>{ random nextInt iterations }</j2></j1>
                                      <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
-                                 </insert>)
+                                 </in>)
               in.close()
               out.close()
               sock.close()
@@ -112,6 +127,7 @@ object Benchmark {
         TimedExecution.average(s"Insert ${iterations * 2} documents", iterations * 2) {
           inserts foreach { _ start }
           inserts foreach { _ join }
+          sync
         }
       }
 
@@ -126,13 +142,13 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <update col="__benchmark1" id={ docs1(random nextInt iterations) toString }>
+                command(in, out, <up col="__benchmark1" id={ docs1(random nextInt iterations) toString }>
                                    <root>
                                      <i1><i2>{ random nextInt iterations }</i2></i1>
                                      <j1><j2>{ random nextInt iterations }</j2></j1>
                                      <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
-                                 </update>)
+                                 </up>)
               in.close()
               out.close()
               sock.close()
@@ -145,13 +161,13 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <update col="__benchmark2" id={ docs2(random nextInt iterations) toString }>
+                command(in, out, <up col="__benchmark2" id={ docs2(random nextInt iterations) toString }>
                                    <root>
                                      <i1><i2>{ random nextInt iterations }</i2></i1>
                                      <j1><j2>{ random nextInt iterations }</j2></j1>
                                      <k1><k2>{ random nextInt iterations }</k2></k1>
                                    </root>
-                                 </update>)
+                                 </up>)
               in.close()
               out.close()
               sock.close()
@@ -162,6 +178,59 @@ object Benchmark {
         TimedExecution.average(s"Update ${iterations * 2} documents", iterations * 2) {
           updates foreach { _ start }
           updates foreach { _ join }
+          sync
+        }
+      }
+
+      // 400k queries (3 lookups each) in two collections
+      {
+        val queries = {
+          for (i <- 1 to numThreads) yield new Thread {
+            val sock = new Socket("localhost", port)
+            val in = new BufferedReader(new InputStreamReader(sock getInputStream))
+            val out = new PrintWriter(sock getOutputStream, true)
+            override def run() {
+              for (j <- 1 to iterations / numThreads)
+                command(in, out, <q col="__benchmark1">
+                                   <diff>
+                                     <intersect>
+                                       <eq limit={ random nextInt 100 toString }><to><i2>{ random nextInt iterations }</i2></to><in><path>i1</path><path>i2</path></in></eq>
+                                       <eq limit={ random nextInt 100 toString }><to><j2>{ random nextInt iterations }</j2></to><in><path>j1</path><path>j2</path></in></eq>
+                                     </intersect>
+                                     <eq limit={ random nextInt 100 toString }><to><k2>{ random nextInt iterations }</k2></to><in><path>k1</path><path>k2</path></in></eq>
+                                   </diff>
+                                 </q>)
+              in.close()
+              out.close()
+              sock.close()
+            }
+          }
+        }.toList ::: {
+          for (i <- 1 to numThreads) yield new Thread {
+            val sock = new Socket("localhost", port)
+            val in = new BufferedReader(new InputStreamReader(sock getInputStream))
+            val out = new PrintWriter(sock getOutputStream, true)
+            override def run() {
+              for (j <- 1 to iterations / numThreads)
+                command(in, out, <q col="__benchmark2">
+                                   <diff>
+                                     <intersect>
+                                       <eq limit={ random nextInt 100 toString }><to><i2>{ random nextInt iterations }</i2></to><in><path>i1</path><path>i2</path></in></eq>
+                                       <eq limit={ random nextInt 100 toString }><to><j2>{ random nextInt iterations }</j2></to><in><path>j1</path><path>j2</path></in></eq>
+                                     </intersect>
+                                     <eq limit={ random nextInt 100 toString }><to><k2>{ random nextInt iterations }</k2></to><in><path>k1</path><path>k2</path></in></eq>
+                                   </diff>
+                                 </q>)
+              in.close()
+              out.close()
+              sock.close()
+            }
+          }
+        }.toList
+        TimedExecution.average(s"${iterations * 2} queries", iterations * 2) {
+          queries foreach { _ start }
+          queries foreach { _ join }
+          sync
         }
       }
 
@@ -176,7 +245,7 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <delete col="__benchmark1" id={ docs1(random nextInt iterations) toString }/>)
+                command(in, out, <de col="__benchmark1" id={ docs1(random nextInt iterations) toString }/>)
               in.close()
               out.close()
               sock.close()
@@ -189,7 +258,7 @@ object Benchmark {
             val out = new PrintWriter(sock getOutputStream, true)
             override def run() {
               for (j <- 1 to iterations / numThreads)
-                command(in, out, <delete col="__benchmark2" id={ docs2(random nextInt iterations) toString }/>)
+                command(in, out, <de col="__benchmark2" id={ docs2(random nextInt iterations) toString }/>)
               in.close()
               out.close()
               sock.close()
@@ -200,58 +269,7 @@ object Benchmark {
         TimedExecution.average(s"Delete ${iterations * 2} documents", iterations * 2) {
           deletes foreach { _ start }
           deletes foreach { _ join }
-        }
-
-        // 400k queries (3 lookups each) in two collections
-        {
-          val queries = {
-            for (i <- 1 to numThreads) yield new Thread {
-              val sock = new Socket("localhost", port)
-              val in = new BufferedReader(new InputStreamReader(sock getInputStream))
-              val out = new PrintWriter(sock getOutputStream, true)
-              override def run() {
-                for (j <- 1 to iterations / numThreads)
-                  command(in, out, <q col="__benchmark1">
-                                     <diff>
-                                       <intersect>
-                                         <eq limit={ random nextInt 100 toString }><to><i2>{ random nextInt iterations }</i2></to><in><path>i1</path><path>i2</path></in></eq>
-                                         <eq limit={ random nextInt 100 toString }><to><j2>{ random nextInt iterations }</j2></to><in><path>j1</path><path>j2</path></in></eq>
-                                       </intersect>
-                                       <eq limit={ random nextInt 100 toString }><to><k2>{ random nextInt iterations }</k2></to><in><path>k1</path><path>k2</path></in></eq>
-                                     </diff>
-                                   </q>)
-                in.close()
-                out.close()
-                sock.close()
-              }
-            }
-          }.toList ::: {
-            for (i <- 1 to numThreads) yield new Thread {
-              val sock = new Socket("localhost", port)
-              val in = new BufferedReader(new InputStreamReader(sock getInputStream))
-              val out = new PrintWriter(sock getOutputStream, true)
-              override def run() {
-                for (j <- 1 to iterations / numThreads)
-                  command(in, out, <q col="__benchmark2">
-                                     <diff>
-                                       <intersect>
-                                         <eq limit={ random nextInt 100 toString }><to><i2>{ random nextInt iterations }</i2></to><in><path>i1</path><path>i2</path></in></eq>
-                                         <eq limit={ random nextInt 100 toString }><to><j2>{ random nextInt iterations }</j2></to><in><path>j1</path><path>j2</path></in></eq>
-                                       </intersect>
-                                       <eq limit={ random nextInt 100 toString }><to><k2>{ random nextInt iterations }</k2></to><in><path>k1</path><path>k2</path></in></eq>
-                                     </diff>
-                                   </q>)
-                in.close()
-                out.close()
-                sock.close()
-              }
-            }
-          }.toList
-
-          TimedExecution.average(s"${iterations * 2} queries", iterations * 2) {
-            queries foreach { _ start }
-            queries foreach { _ join }
-          }
+          sync
         }
       }
     } finally {

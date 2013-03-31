@@ -140,13 +140,13 @@ class Query(val col: Collection) {
               op.label match {
                 case "all" => col.all toSet
                 case "diff" =>
-                  val result = { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty)
+                  val result = { for (littleOp <- op.child) yield eval(<a>{ littleOp }</a>) } filter (!_.isEmpty)
                   if (result.isEmpty)
                     Set[Int]()
                   else
                     result reduceLeft (_ diff _)
                 case "intersect" =>
-                  val result = { for (littleOp <- op.child) yield eval(<littleRoot>{ littleOp }</littleRoot>) } filter (!_.isEmpty)
+                  val result = { for (littleOp <- op.child) yield eval(<a>{ littleOp }</a>) } filter (!_.isEmpty)
                   if (result.isEmpty)
                     Set[Int]()
                   else

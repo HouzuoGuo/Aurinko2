@@ -1,7 +1,6 @@
 package net.houzuo.aurinko2.test.logic
 
 import scala.collection.mutable.ArrayBuffer
-import scala.math.max
 import scala.util.Random
 import org.scalatest.FunSuite
 import TemporaryFactory.collection
@@ -16,8 +15,8 @@ class Benchmark extends FunSuite {
   /*
    * This benchmark spawns multiple threads to simulate concurrent read and write operations.
    */
-  test("collection storage layer performance benchmark") {
-    val numThreads = max(Runtime.getRuntime.availableProcessors * 2, 4) // At least 4 threads
+  test("collection performance benchmark") {
+    val numThreads = Runtime.getRuntime.availableProcessors * 4
     val iterations = 200000
     val col = collection
     col.index(List("i1", "i2"), 14, 200)

@@ -46,7 +46,7 @@ class Worker(val db: Database, val sock: Socket) {
             try {
               go(ConstructingParser.fromSource(Source.fromString(lines mkString "\n"), true).document.docElem)
             } catch {
-              case e: SAXParseException => out println <err>Unable to parse request as XML document</err>
+              case e: SAXParseException => out println <err>Request is not a valid XML document</err>
               case e: Exception =>
                 respond { Some(<err>{ e.getMessage }</err>) }
                 Worker.LOG severe s"${e.getMessage}: \n${e.getStackTraceString}"
@@ -87,7 +87,7 @@ class Worker(val db: Database, val sock: Socket) {
         out println <err>{ e getMessage }</err>
         e printStackTrace
     } finally {
-      out println <done/>
+      out println <ok/>
     }
   }
 
@@ -96,15 +96,15 @@ class Worker(val db: Database, val sock: Socket) {
     req.label.toLowerCase match {
 
       // Get all collection names
-      case "all" => respond { Some(<all>{ for (col <- db.all) yield <col>{ col }</col> }</all>) }
+      case "all" => respond { Some(<r>{ for (col <- db.all) yield <col>{ col }</col> }</r>) }
 
       // Get IO queue length on all collections
       case "load" => respond {
-        Some(<load>{
+        Some(<r>{
           for (col <- db.all) yield <col name={ col }>{
             for (thing <- db get (col) load) yield <queue name={ thing._1.toString }>{ thing._2 }</queue>
           }</col>
-        }</load>)
+        }</r>)
       }
 
       // Create collection
@@ -112,29 +112,30 @@ class Worker(val db: Database, val sock: Socket) {
         req attribute "col" match {
           case Some(name) =>
             db create name.text; None
-          case None => Some(<err>Please specify collection name in "name" attribute</err>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
       // Rename collection
-      case "rename" => respond {
-        req attribute "old" match {
-          case Some(oldName) =>
-            req attribute "new" match {
-              case Some(newName) =>
-                db rename (oldName.text, newName.text); None
-              case None => Some(<err>Please spicify new collection in "new" attribute</err>)
-            }
-          case None => Some(<err>Please specify old collection in "old" attribute</err>)
+      case "rename" =>
+        respond {
+          req attribute "col" match {
+            case Some(oldName) =>
+              req attribute "to" match {
+                case Some(newName) =>
+                  db rename (oldName.text, newName.text); None
+                case None => Some(<err>Please spicify new collection in "to" attribute</err>)
+              }
+            case None => Some(<err>Please specify original collection name in "col" attribute</err>)
+          }
         }
-      }
 
       // Drop collection
       case "drop" => respond {
         req attribute "col" match {
           case Some(name) =>
             db drop name.text; None
-          case None => Some(<err>Please specify collection name in "name" attribute</err>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
@@ -143,16 +144,16 @@ class Worker(val db: Database, val sock: Socket) {
         req attribute "col" match {
           case Some(name) =>
             db repair name.text; None
-          case None => Some(<err>Please specify collection name in "name" attribute</err>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
       // Insert documents
-      case "insert" => respond {
+      case "in" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
-            Some(<inserted>{ col insert req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem] }</inserted>)
+            Some(<in>{ col insert req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem] }</in>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
@@ -161,37 +162,37 @@ class Worker(val db: Database, val sock: Socket) {
       case "get" => respond {
         req attribute "col" match {
           case Some(colName) =>
-            Some(<doc>{
+            Some(<r>{
               db get colName.text read {
                 req attribute "id" match {
                   case Some(id) => id.text toInt
                   case None     => throw new Exception("Please specify ID of document to retrie")
                 }
               }
-            }</doc>)
+            }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
       // Update documents
-      case "update" => respond {
+      case "up" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
-            Some(<updated>{
+            Some(<r>{
               req.attribute("id") match {
                 case Some(oldID) =>
                   <old>{ oldID text }</old>
                   <new>{ col.update(oldID.text toInt, req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem]) get }</new>
                 case None => throw new Exception("Please specify ID of document to update")
               }
-            }</updated>)
+            }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
       // Delete documents
-      case "delete" => respond {
+      case "de" => respond {
         req attribute "col" match {
           case Some(colName) =>
             req attribute "id" match {
@@ -204,18 +205,18 @@ class Worker(val db: Database, val sock: Socket) {
       }
 
       // Get all documents
-      case "findall" => respond {
+      case "all" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db.get(colName.text)
-            Some(<collection>{
+            Some(<r>{
               for (
                 docID <- req attribute ("limit") match {
                   case Some(number) => col.all.take(number.text.toInt)
                   case None         => col.all
                 }
               ) yield <doc>{ col.read(docID) get }</doc>
-            }</collection>)
+            }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
@@ -225,11 +226,11 @@ class Worker(val db: Database, val sock: Socket) {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
-            Some(<indexes> {
+            Some(<r> {
               for (hash <- col.hashes) yield <index type="hash" hash-bits={ hash._2._2.hashBits toString } bucket-size={ hash._2._2.perBucket toString }> {
                 for (pathSegment <- hash._1) yield <path>{ pathSegment }</path>
               }</index>
-            }</indexes>)
+            }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
@@ -263,9 +264,9 @@ class Worker(val db: Database, val sock: Socket) {
       // Query and return document ID
       case "q" => respond {
         req attribute "col" match {
-          case Some(colName) => Some(<result>{
+          case Some(colName) => Some(<r>{
             for (id <- new Query(db get colName.text).eval(req)) yield <id>{ id }</id>
-          }</result>)
+          }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
@@ -275,9 +276,9 @@ class Worker(val db: Database, val sock: Socket) {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
-            Some(<result>{
+            Some(<r>{
               for (id <- new Query(col).eval(req)) yield <doc id={ id toString }>{ col read id get }</doc>
-            }</result>)
+            }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }

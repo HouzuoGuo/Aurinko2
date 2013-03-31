@@ -149,11 +149,11 @@ class Worker(val db: Database, val sock: Socket) {
       }
 
       // Insert documents
-      case "in" => respond {
+      case "insert" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
-            Some(<in>{ col insert req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem] }</in>)
+            Some(<r>{ col insert req.child.filter(_.isInstanceOf[Elem])(0).asInstanceOf[Elem] }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
@@ -175,7 +175,7 @@ class Worker(val db: Database, val sock: Socket) {
       }
 
       // Update documents
-      case "up" => respond {
+      case "update" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
@@ -192,7 +192,7 @@ class Worker(val db: Database, val sock: Socket) {
       }
 
       // Delete documents
-      case "de" => respond {
+      case "delete" => respond {
         req attribute "col" match {
           case Some(colName) =>
             req attribute "id" match {
@@ -205,7 +205,7 @@ class Worker(val db: Database, val sock: Socket) {
       }
 
       // Get all documents
-      case "all" => respond {
+      case "findall" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db.get(colName.text)

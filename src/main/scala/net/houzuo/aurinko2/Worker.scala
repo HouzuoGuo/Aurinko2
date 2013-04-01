@@ -215,7 +215,7 @@ class Worker(val db: Database, val sock: Socket) {
                   case Some(number) => col.all.take(number.text.toInt)
                   case None         => col.all
                 }
-              ) yield <doc>{ col.read(docID) get }</doc>
+              ) yield <doc id={ docID toString }>{ col.read(docID) get }</doc>
             }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }

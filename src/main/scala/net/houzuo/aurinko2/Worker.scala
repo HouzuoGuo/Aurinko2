@@ -212,7 +212,7 @@ class Worker(val db: Database, val sock: Socket) {
             Some(<r>{
               for (
                 docID <- req attribute ("limit") match {
-                  case Some(number) => col.all.take(number.text.toInt)
+                  case Some(number) => col.all.take(number.text toInt)
                   case None         => col.all
                 }
               ) yield <doc id={ docID toString }>{ col.read(docID) get }</doc>
@@ -251,7 +251,7 @@ class Worker(val db: Database, val sock: Socket) {
         }
       }
 
-      // Drop a index
+      // Drop an index
       case "drop-index" => respond {
         req attribute "col" match {
           case Some(colName) =>
@@ -265,20 +265,30 @@ class Worker(val db: Database, val sock: Socket) {
       case "q" => respond {
         req attribute "col" match {
           case Some(colName) => Some(<r>{
-            for (id <- new Query(db get colName.text).eval(req)) yield <id>{ id }</id>
+            for (id <- new Query(db get colName.text) eval req) yield <id>{ id }</id>
           }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }
 
-      // Query and return document content
+      // Query and return document ID and content
       case "select" => respond {
         req attribute "col" match {
           case Some(colName) =>
             val col = db get colName.text
             Some(<r>{
-              for (id <- new Query(col).eval(req)) yield <doc id={ id toString }>{ col read id get }</doc>
+              for (id <- new Query(col) eval req) yield <doc id={ id toString }>{ col read id get }</doc>
             }</r>)
+          case None => Some(<err>Please specify collection name in "col" attribute</err>)
+        }
+      }
+
+      // Query and return count of result documents
+      case "count" => respond {
+        req attribute "col" match {
+          case Some(colName) =>
+            val col = db get colName.text
+            Some(<r>{ new Query(col) eval req size }</r>)
           case None => Some(<err>Please specify collection name in "col" attribute</err>)
         }
       }

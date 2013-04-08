@@ -39,9 +39,10 @@ class Query(val col: Collection) {
    * </eq>
    */
   def qeq(op: Node) = {
+    println("QEQ called")
     val children = op.child.map { c => c.label -> c } toMap
     val path = children get "in" match {
-      case Some(in) => in.child map (_.text) toList
+      case Some(in) => in.child filter (_.isInstanceOf[Elem]) map (_.text) toList
       case None     => throw new Exception("Please specify matching path in <in></in>")
     }
     val limit = op attribute "limit" match {
@@ -150,7 +151,7 @@ class Query(val col: Collection) {
                   if (result.isEmpty)
                     Set[Int]()
                   else
-                    result reduceLeft (_ diff _)
+                    result reduceLeft (_ intersect _)
                 case _ => throw new Exception(s"Unknown query operation '${op.label}'")
               }
             } drop {

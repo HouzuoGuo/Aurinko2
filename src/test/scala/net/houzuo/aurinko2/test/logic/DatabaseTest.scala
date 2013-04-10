@@ -52,7 +52,6 @@ class DatabaseTest extends FunSuite {
     db.repair("toRepair")
     val repaired = db.get("toRepair")
     assert(repaired.all().size == 1)
-    println(repaired.hashes.keySet)
     assert(repaired.hashes.keySet.toSet == Set(List("a", "b", "c"), List("a", "b", "d")))
     assert(repaired.read(repaired.all()(0)).get == <root>2</root>)
   }

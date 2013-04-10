@@ -11,7 +11,6 @@ object Main {
 
   def main(args: Array[String]): Unit = {
     if (args.length != 2 && args.length != 3) {
-      println(args mkString ("|"))
       System.err println "sbt run PORT DB_DIR [benchmark]";
       System exit (1)
     }

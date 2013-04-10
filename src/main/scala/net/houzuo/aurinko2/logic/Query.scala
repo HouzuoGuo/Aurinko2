@@ -39,7 +39,6 @@ class Query(val col: Collection) {
    * </eq>
    */
   def qeq(op: Node) = {
-    println("QEQ called")
     val children = op.child.map { c => c.label -> c } toMap
     val path = children get "in" match {
       case Some(in) => in.child filter (_.isInstanceOf[Elem]) map (_.text) toList

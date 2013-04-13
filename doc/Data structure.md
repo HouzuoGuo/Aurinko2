@@ -130,7 +130,7 @@ There is no padding before or after an entry. Each entry is stored in the follow
 # ID index
 It is an ordinary hash index file with keys and values set to all document IDs.
 
-Many common queries benefit from ID index, such as:
+Many common queries use ID index, such as:
 
-- Get all coument IDs
+- Get all document IDs
 - Count number of documents in a collection

@@ -7,7 +7,7 @@ Features
 - Store, manage and retrieve XML documents
 - Client-server data exchange using XML format
 - Build powerful queries using built-in simple query syntax
-- Optimized for scalability on SMP systems
+- Optimised for scalability on SMP systems
 - Never lose your data in case of a crash
 
 Tutorial
@@ -19,7 +19,7 @@ Implementation details
 -
 
 - [Data structure][]
-- [Index and query optimization][]
+- [Index and query optimisation][]
 - [Concurrency and networking][]
 - [Limitations][]
 
@@ -61,7 +61,7 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 
 [tutorial]:
 [Data structure]:
-[Index and query optimization]:
+[Index and query optimisation]:
 [Concurrency and networking]:
 [Limitations]:
 [Issues]:

@@ -1,13 +1,13 @@
 Aurinko2
 =
-An XML document database engine implementation in Scala.
+Aurinko2 - An XML document database engine implementation in Scala.
 
 Features
 -
 - Store, manage and retrieve XML documents
 - Client-server data exchange using XML format
 - Build powerful queries using built-in simple query syntax
-- Optimised for scalability on SMP systems
+- Optimised for scalability on SMP systems with fairness guarantee
 - Never lose your data in case of a crash
 
 Tutorial
@@ -33,7 +33,7 @@ Versions
   </tr>
   <tr>
     <td>alpha</td>
-    <td>2 April 2013</td>
+    <td>14 April 2013</td>
     <td>Initial release</td>
   </tr>
 </table>
@@ -59,12 +59,12 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </pre>
 
-[tutorial]:
-[Data structure]:
-[Index and query optimisation]:
-[Concurrency and networking]:
-[Limitations]:
-[Issues]:
+[tutorial]: https://github.com/HouzuoGuo/Aurinko2/wiki/Tutorial
+[Data structure]: https://github.com/HouzuoGuo/Aurinko2/wiki/Data-structure
+[Index and query optimisation]: https://github.com/HouzuoGuo/Aurinko2/wiki/Index-and-query-optimisation
+[Concurrency and networking]: https://github.com/HouzuoGuo/Aurinko2/wiki/Concurrency-and-networking
+[Limitations]: https://github.com/HouzuoGuo/Aurinko2/wiki/Limitations
+[Issues]: https://github.com/HouzuoGuo/Aurinko2/issues
 [Howard]: mailto:guohouzuo@gmail.com
 [Twitter]: https://twitter/hzguo
 [blog]: http://allstarnix.blogspot.com.au

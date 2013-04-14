@@ -9,7 +9,7 @@ Aurinko2 data structures are designed to be corruption-resistant; any amount of 
 # Database
 Database is a file system directory.
 
-Aurinko2 require RWX (read/write/execute) permissions on the directory.
+Aurinko2 requires RWX (read/write/execute) permissions on the directory.
 
 # Collection
 Collection is a file system directory under Database directory.
@@ -20,7 +20,7 @@ Collection directory has the following files:
 - `id` - document ID index
 - User-created indexes
 
-Aurinko2 server require RW permissions on those files.
+Aurinko2 server requires RW permissions on those files.
 
 # Collection data file
 Data file contains all document content, new documents are inserted to end-of-data* and are left room for future updates.

@@ -66,7 +66,7 @@ object Benchmark {
       command(single_in, single_out, <hash-index col="__benchmark2" hash-bits="14" bucket-size="200"><path>k1</path><path>k2</path></hash-index>)
 
       val iterations = 200000
-      val numThreads = min(Runtime.getRuntime.availableProcessors * 50, 400) // Good to have many IO connections
+      val numThreads = min(Runtime.getRuntime.availableProcessors * 25, 200) // Good to have many IO connections
 
       // Insert 400k documents (total) into two collections 
       {

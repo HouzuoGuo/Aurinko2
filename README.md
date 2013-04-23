@@ -76,5 +76,5 @@ LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON A
 [Limitations]: https://github.com/HouzuoGuo/Aurinko2/wiki/Limitations
 [Issues]: https://github.com/HouzuoGuo/Aurinko2/issues
 [Howard]: mailto:guohouzuo@gmail.com
-[Twitter]: https://twitter/hzguo
+[Twitter]: https://twitter.com/hzguo
 [blog]: http://allstarnix.blogspot.com.au

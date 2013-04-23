@@ -10,6 +10,16 @@ Features
 - Optimised for scalability on SMP systems with fairness guarantee
 - Never lose your data in case of a crash
 
+Performance Expectation
+-
+Aurinko2 is extremely scalable, eventually the bottleneck becomes your disk/network IO.
+On a 5 years old desktop workstation, when used as an embedded database, Aurinko2 can do in one second:
+
+- Insert/delete 30k documents OR
+- Update 10k documents OR
+- Read 50k documents OR
+- Run 7k triple lookup queries
+
 Tutorial
 -
 

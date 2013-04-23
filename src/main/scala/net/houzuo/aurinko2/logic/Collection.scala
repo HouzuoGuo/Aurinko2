@@ -111,7 +111,7 @@ class Collection(val path: String) {
 
   // Open data files
   val collection = new CollFile(new RandomAccessFile(Paths.get(path, "data") toString, "rw") getChannel)
-  val idIndex = new Hash(new RandomAccessFile(Paths.get(path, "id") toString, "rw") getChannel, 14, 100)
+  val idIndex = new Hash(new RandomAccessFile(Paths.get(path, "id") toString, "rw") getChannel, 12, 200)
 
   Collection.LOG info s"Successfully loaded collection $path"
 

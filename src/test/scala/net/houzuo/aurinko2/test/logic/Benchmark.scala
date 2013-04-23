@@ -33,27 +33,6 @@ class Benchmark extends FunSuite {
               <i1><i2>{ random nextInt iterations }</i2></i1>
               <j1><j2>{ random nextInt iterations }</j2></j1>
               <k1><k2>{ random nextInt iterations }</k2></k1>
-              <more>
-                ssh-rsa
-AAAAB3NzaC1yc2EAAAADAQABAAABAQC4KLmaRhJ/
-DKA/LnU8sI/gghFEiy+gA8P5qz3UfOoA6/uPeM2E3V139EmQ7J2C/
-/+ceyO4OehcZY3BxyAe03SrQMtJSMGn0BKP79HDKhYOjMaldzAKz2
-NJLxUdmzzLb4wV6I18pr7dTm1IkAhhS/GMkYAWqVhy3FnG2mc99FO
-dKCZvSjzlw96or+5R0xOGPHjbM2qrZUzRl0aDkv52Nll2hrwFIhUC
-JF4jxLyGmoeZVzyv4gY/Mz9oaNLNWhjt1HOUJ6pakY7FLDHCqvn4P
-MRu4rC1LEJHL8CH++xTk99YOYsW+hylbTayM7GCkgEX1gjVg/p6ld
-oEiNaBnmNgPavP howard@howard
-              </more><more>
-                       ssh-rsa
-AAAAB3NzaC1yc2EAAAADAQABAAABAQC4KLmaRhJ/
-DKA/LnU8sI/gghFEiy+gA8P5qz3UfOoA6/uPeM2E3V139EmQ7J2C/
-/+ceyO4OehcZY3BxyAe03SrQMtJSMGn0BKP79HDKhYOjMaldzAKz2
-NJLxUdmzzLb4wV6I18pr7dTm1IkAhhS/GMkYAWqVhy3FnG2mc99FO
-dKCZvSjzlw96or+5R0xOGPHjbM2qrZUzRl0aDkv52Nll2hrwFIhUC
-JF4jxLyGmoeZVzyv4gY/Mz9oaNLNWhjt1HOUJ6pakY7FLDHCqvn4P
-MRu4rC1LEJHL8CH++xTk99YOYsW+hylbTayM7GCkgEX1gjVg/p6ld
-oEiNaBnmNgPavP howard@howard
-                     </more>
             </root>)
       }
     }

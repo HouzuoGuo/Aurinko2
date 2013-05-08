@@ -103,8 +103,10 @@ class Benchmark extends FunSuite {
       deletes foreach { _ join }
     }
 
-    println("Get all 200k document IDs")
-    time(1) { col.all }
+    println("Get all 200k document IDs 10 times")
+    time(10) {
+      col.all
+    }
 
     println("Index 200k documents")
     col.unindex(List("i1", "i2"))
